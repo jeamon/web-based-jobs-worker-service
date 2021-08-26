@@ -35,7 +35,7 @@ import (
 // Author   : Jerome AMON
 // Created  : 20 August 2021
 
-const webserver = "0.0.0.0:8080"
+const address = "0.0.0.0:8080"
 
 // waiting time before program exit at failure.
 const waitingTime = 3
@@ -183,7 +183,6 @@ func webHelp(w http.ResponseWriter, r *http.Request) {
 // curl localhost:8080/execute?cmd=rmdir+jerome
 // replacing string. use + after ? AND use %20 before ?
 func instantCommandExecutor(w http.ResponseWriter, r *http.Request) {
-	weblog.Printf("received request - [cmd] - %s\n", r.URL.Path)
 	w.Header().Set("Content-Type", "text/plain; charset=utf8")
 	msg := []byte("\n[+] Hello • failed to execute the command passed.\n")
 
@@ -326,7 +325,8 @@ func executeJob(job Job, ctx context.Context) {
 }
 
 // jobsMonitor watches the global jobs queue and spin up a separate executor to handle the task.
-func jobsMonitor(exit <-chan struct{}) {
+func jobsMonitor(exit <-chan struct{}, wg *sync.WaitGroup) {
+	defer wg.Done()
 	ctx, cancel := context.WithCancel(context.Background())
 	// indefinite loop on the jobs channel.
 	for {
@@ -347,7 +347,6 @@ func jobsMonitor(exit <-chan struct{}) {
 // handleJobsRequests handles user jobs submission request and build the jobs structure for further processing.
 func handleJobsRequests(w http.ResponseWriter, r *http.Request) {
 
-	weblog.Printf("received request - [job] - %s\n", r.URL.Path)
 	// try to setup the response as not buffered data.
 	if f, ok := w.(http.Flusher); ok {
 		f.Flush()
@@ -415,7 +414,7 @@ func handleJobsRequests(w http.ResponseWriter, r *http.Request) {
 // checkJobsStatusById tells us if one or multiple submitted jobs are either in progress
 // or terminated or do not exist. triggered for following request : /jobs/status?id=xx&id=xx
 func checkJobsStatusById(w http.ResponseWriter, r *http.Request) {
-	weblog.Printf("received request - [job] - %s\n", r.URL.Path)
+
 	w.Header().Set("Content-Type", "text/plain; charset=utf8")
 
 	// parse all query strings.
@@ -463,7 +462,6 @@ func checkJobsStatusById(w http.ResponseWriter, r *http.Request) {
 // getAllJobsStatus display all submitted jobs details
 // triggered for following request : /jobs/status/
 func getAllJobsStatus(w http.ResponseWriter, r *http.Request) {
-	weblog.Printf("received request - [job] - %s\n", r.URL.Path)
 	w.Header().Set("Content-Type", "text/plain; charset=utf8")
 	w.WriteHeader(200)
 	w.Write([]byte("\n[+] status of all current jobs - zoom in to fit the screen\n\n"))
@@ -488,7 +486,6 @@ func getAllJobsStatus(w http.ResponseWriter, r *http.Request) {
 
 // getJobsResultsById retreive result output for a given (*job).
 func getJobsResultsById(w http.ResponseWriter, r *http.Request) {
-	weblog.Printf("received request - [job] - %s\n", r.URL.Path)
 	w.Header().Set("Content-Type", "text/plain; charset=utf8")
 
 	// expect one value for the query - if multiple passed only first will be returned.
@@ -522,8 +519,8 @@ func getJobsResultsById(w http.ResponseWriter, r *http.Request) {
 
 // cleanupMapResults runs every <interval> hours and delete job which got <maxcount>
 // times requested or completed for more than <deadtime> hours.
-func cleanupMapResults(interval int, maxcount int, deadtime int, exit <-chan struct{}) {
-
+func cleanupMapResults(interval int, maxcount int, deadtime int, exit <-chan struct{}, wg *sync.WaitGroup) {
+	defer wg.Done()
 	for {
 		select {
 		case <-exit:
@@ -547,8 +544,8 @@ func cleanupMapResults(interval int, maxcount int, deadtime int, exit <-chan str
 }
 
 // handleSignal is a function that process SIGTERM from kill command or CTRL-C or more.
-func handleSignal(exit chan struct{}) {
-
+func handleSignal(exit chan struct{}, wg *sync.WaitGroup) {
+	defer wg.Done()
 	sigch := make(chan os.Signal, 1)
 	signal.Notify(sigch, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGKILL,
 		syscall.SIGTERM, syscall.SIGHUP, os.Interrupt, os.Kill)
@@ -781,46 +778,100 @@ func setupLoggers() {
 	jobslog = log.New(jobslogfile, "[ INFOS ] ", log.LstdFlags|log.Lshortfile)
 }
 
-func startWebServer() error {
+// logRequestMiddleware is middleware that logs incoming request details.
+func logRequestMiddleware(next http.Handler) http.Handler {
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		weblog.Printf("received request - ip: %s - method: %s - url: %s - browser: %s\n", r.RemoteAddr, r.Method, r.URL.Path, r.UserAgent())
+		next.ServeHTTP(w, r)
+	})
+}
+
+func startWebServer(exit <-chan struct{}) error {
+
 	// start the web server.
-	mux := http.NewServeMux()
+	router := http.NewServeMux()
 	// default request - list how to details.
-	mux.HandleFunc("/", webHelp)
+	router.HandleFunc("/", webHelp)
 	// expected query string : /execute?cmd=xxxxx
-	mux.HandleFunc("/execute", instantCommandExecutor)
+	router.HandleFunc("/execute", instantCommandExecutor)
 	// expected query string : /jobs?cmd=xxxxx
-	mux.HandleFunc("/jobs", handleJobsRequests)
+	router.HandleFunc("/jobs", handleJobsRequests)
 	// expected query string : /jobs/status?id=xxxxx
-	mux.HandleFunc("/jobs/status", checkJobsStatusById)
+	router.HandleFunc("/jobs/status", checkJobsStatusById)
 	// expected query string : /jobs/results?id=xxxxx
-	mux.HandleFunc("/jobs/results", getJobsResultsById)
+	router.HandleFunc("/jobs/results", getJobsResultsById)
 	// expected URI : /jobs/status/ or /jobs/stats
-	mux.HandleFunc("/jobs/status/", getAllJobsStatus)
-	mux.HandleFunc("/jobs/stats/", getAllJobsStatus)
-	weblog.Printf("started web server at %s\n", webserver)
+	router.HandleFunc("/jobs/status/", getAllJobsStatus)
+	router.HandleFunc("/jobs/stats/", getAllJobsStatus)
+
+	webserver := &http.Server{
+		Addr:         address,
+		Handler:      logRequestMiddleware(router),
+		ErrorLog:     weblog,
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 15 * time.Second,
+		IdleTimeout:  60 * time.Second,
+	}
+
+	// goroutine in charge of shutting down the server when triggered.
+	go func() {
+		// wait until close or something comes in.
+		<-exit
+		log.Printf("shutting down the web server ... max waiting for 60 secs.")
+		ctx, _ := context.WithTimeout(context.Background(), 60*time.Second)
+
+		if err := webserver.Shutdown(ctx); err != nil {
+			// error due to closing listeners, or context timeout.
+			log.Printf("failed to shutdown gracefully the web server - errmsg: %v", err)
+			if err == context.DeadlineExceeded {
+				log.Printf("the web server did not shutdown before 45 secs deadline.")
+			} else {
+				log.Printf("an error occured when closing underlying listeners.")
+			}
+
+			return
+		}
+
+		// err = nil - successfully shutdown the server.
+		log.Printf("the web server was successfully shutdown down.")
+
+	}()
+
 	// make listen on all interfaces - helps on container binding
-	// tun http web server into a separate goroutine.
-	err := http.ListenAndServe(webserver, mux)
-	weblog.Printf("web server failed to serve - errmsg : %v\n", err)
-	return err
+	// if shutdown error will be http.ErrServerClosed.
+	log.Println("web server is starting ...")
+	weblog.Printf("starting web server at %s\n", address)
+	if err := webserver.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		log.Fatalf("failed to start the web server on %s - errmsg: %v\n", address, err)
+		return err
+	}
+
+	return nil
 }
 
 func runDeamon() error {
+
 	// silently remove pid file if deamon exit.
 	defer func() {
 		os.Remove(pidFile)
 		os.Exit(0)
 	}()
+	// to make sure all goroutines exit before leaving the program.
+	wg := &sync.WaitGroup{}
 	// channel to instruct jobs monitor to exit.
-	exit := make(chan struct{})
+	exit := make(chan struct{}, 1)
 	// background handler for interruption signals.
-	go handleSignal(exit)
+	wg.Add(1)
+	go handleSignal(exit, wg)
 	// execute the init routine.
 	initializer()
 	// background jobs map cleaner.
-	go cleanupMapResults(interval, maxcount, maxage, exit)
+	wg.Add(1)
+	go cleanupMapResults(interval, maxcount, maxage, exit, wg)
 	// start the jobs queue monitor
-	go jobsMonitor(exit)
+	wg.Add(1)
+	go jobsMonitor(exit, wg)
 	// setup loggers
 	setupLoggers()
 
@@ -835,8 +886,10 @@ func runDeamon() error {
 	home, _ := os.UserHomeDir()
 	os.Chdir(home)
 
-	// run http web server
-	err = startWebServer()
+	// run http web server and block until server exits (shutdown).
+	err = startWebServer(exit)
+	// after web server stopped - block until all goroutines exit as well.
+	wg.Wait()
 	return err
 }
 
