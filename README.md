@@ -158,7 +158,6 @@ go build -o worker worker.go help.go
 * add capability to stop one or more running jobs
 * add capability to load configuration details from file at startup
 * add capability to restart one or more submitted jobs
-* extend context cancellation capability to all goroutines
 * add new submitted job to result store even not completed
 * add HTTPS support and option to start HTTP or HTTPS server 
 
