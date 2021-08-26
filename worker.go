@@ -546,7 +546,7 @@ func cleanupMapResults(interval int, maxcount int, deadtime int, exit <-chan str
 	}
 }
 
-// processSignal is a function that process SIGTERM from kill command or CTRL-C or more.
+// handleSignal is a function that process SIGTERM from kill command or CTRL-C or more.
 func handleSignal(exit chan struct{}) {
 
 	sigch := make(chan os.Signal, 1)
