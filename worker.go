@@ -326,6 +326,7 @@ func executeJob(job Job, ctx context.Context) {
 
 // jobsMonitor watches the global jobs queue and spin up a separate executor to handle the task.
 func jobsMonitor(exit <-chan struct{}, wg *sync.WaitGroup) {
+	log.Println("started goroutine to monitor submitted jobs queue ...")
 	defer wg.Done()
 	ctx, cancel := context.WithCancel(context.Background())
 	// indefinite loop on the jobs channel.
@@ -524,6 +525,7 @@ func getJobsResultsById(w http.ResponseWriter, r *http.Request) {
 // cleanupMapResults runs every <interval> hours and delete job which got <maxcount>
 // times requested or completed for more than <deadtime> hours.
 func cleanupMapResults(interval int, maxcount int, deadtime int, exit <-chan struct{}, wg *sync.WaitGroup) {
+	log.Println("started goroutine to cleanup stalling jobs ...")
 	defer wg.Done()
 	for {
 		select {
@@ -549,6 +551,7 @@ func cleanupMapResults(interval int, maxcount int, deadtime int, exit <-chan str
 
 // handleSignal is a function that process SIGTERM from kill command or CTRL-C or more.
 func handleSignal(exit chan struct{}, wg *sync.WaitGroup) {
+	log.Println("started goroutine for exit signal handling ...")
 	defer wg.Done()
 	sigch := make(chan os.Signal, 1)
 	signal.Notify(sigch, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGKILL,
@@ -674,8 +677,16 @@ func startDeamon() error {
 	// launch the program with deamon as argument
 	// syscall exec is not the same as fork.
 	cmd := exec.Command(os.Args[0], "run")
-	// setup the deamon working directory to root avoid conflicting.
-	// cmd.Dir = "/"
+	// setup the deamon working directory current folder.
+	cmd.Dir = "."
+	// single file to log output of worker - read by all and write only by the user.
+	workerlog, err := os.OpenFile("worker.log", os.O_APPEND | os.O_CREATE | os.O_WRONLY, 0644)
+	if err != nil {
+		fmt.Println("failed to create or open deamon process log file worker.log")
+		return err
+	}
+
+	cmd.Stdout, cmd.Stderr = workerlog, workerlog
 
 	// start the process asynchronously.
 	if err := cmd.Start(); err != nil {
@@ -693,7 +704,7 @@ func startDeamon() error {
 	}
 
 	// speudo deamon started
-	fmt.Printf("started deamon with pid [%d] - ppid was [%d]\n", cmd.Process.Pid, os.Getpid())
+	log.Printf("started deamon with pid [%d] - ppid was [%d]\n", cmd.Process.Pid, os.Getpid())
 
 	// below exit will terminate the group leader (current process)
 	// so once you close the terminal - the session will be terminated
@@ -780,6 +791,7 @@ func setupLoggers() {
 
 	// setup logging format and parameters.
 	jobslog = log.New(jobslogfile, "[ INFOS ] ", log.LstdFlags|log.Lshortfile)
+	log.Println("all log files successfully setup ...")
 }
 
 // logRequestMiddleware is middleware that logs incoming request details.
@@ -820,6 +832,7 @@ func startWebServer(exit <-chan struct{}) error {
 
 	// goroutine in charge of shutting down the server when triggered.
 	go func() {
+		log.Println("started goroutine to shutdown web server ...")
 		// wait until close or something comes in.
 		<-exit
 		log.Printf("shutting down the web server ... max waiting for 60 secs.")
@@ -844,7 +857,7 @@ func startWebServer(exit <-chan struct{}) error {
 
 	// make listen on all interfaces - helps on container binding
 	// if shutdown error will be http.ErrServerClosed.
-	log.Println("web server is starting ...")
+	log.Printf("starting http web server on %s ...\n", address)
 	weblog.Printf("starting web server at %s\n", address)
 	if err := webserver.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Fatalf("failed to start the web server on %s - errmsg: %v\n", address, err)
@@ -855,7 +868,13 @@ func startWebServer(exit <-chan struct{}) error {
 }
 
 func runDeamon() error {
-
+	user, err := user.Current()
+	if err != nil {
+		log.Printf("failed to retrieve owner name of this worker process - errmsg: %v", err)
+		// return err
+	}
+		
+	log.Printf("started deamon - pid [%d] - user [%s] - ppid [%d]\n", os.Getpid(), user.Username, os.Getppid())
 	// silently remove pid file if deamon exit.
 	defer func() {
 		os.Remove(pidFile)
@@ -879,21 +898,11 @@ func runDeamon() error {
 	// setup loggers
 	setupLoggers()
 
-	user, err := user.Current()
-	if err != nil {
-		weblog.Println(err.Error())
-		return err
-	}
-	weblog.Printf("starting deamon - pid [%d] - with user [%s] - parent pid [%d]\n", os.Getpid(), user.Username, os.Getppid())
-
-	// change working directory to user home directory.
-	home, _ := os.UserHomeDir()
-	os.Chdir(home)
-
 	// run http web server and block until server exits (shutdown).
 	err = startWebServer(exit)
 	// after web server stopped - block until all goroutines exit as well.
 	wg.Wait()
+	log.Printf("successfully stopped all goroutines from worker - pid [%d] - user [%s] - ppid [%d]\n", os.Getpid(), user.Username, os.Getppid())
 	return err
 }
 
