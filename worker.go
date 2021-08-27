@@ -391,7 +391,7 @@ func handleJobsRequests(w http.ResponseWriter, r *http.Request) {
 			id:          generateID(),
 			pid:         0,
 			task:        cmd,
-			iscompleted: true,
+			iscompleted: false,
 			issuccess:   false,
 			exitcode:    -1,
 			errormsg:    "",
@@ -402,7 +402,11 @@ func handleJobsRequests(w http.ResponseWriter, r *http.Request) {
 			starttime:   time.Time{},
 			endtime:     time.Time{},
 		}
-		// store this job for further processing.
+		// register job to global map results so user can check status while job being executed.
+		mapLock.Lock()
+		globalJobsResults[job.id] = &job
+		mapLock.Unlock()
+		// add this job to the processing queue.
 		globalJobsQueue <- job
 		jobslog.Printf("added new job with id [%s] to the queue\n", job.id)
 		// stream the added job details to user/client.
