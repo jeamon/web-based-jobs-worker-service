@@ -266,6 +266,8 @@ func executeJob(job Job, ctx context.Context) {
 	}()
 
 	var err error
+	// track if job stop was requested or not.
+	stopped := false
 	// block on select until one case hits.
 	select {
 
@@ -289,6 +291,19 @@ func executeJob(job Job, ctx context.Context) {
 		}
 		// leave the select loop.
 		break
+
+	case <-job.stop:
+		stopped = true
+		// stop requested by user. kill the process and exit from this function.
+		jobslog.Printf("job stop requested - stopping of job with id [%s]\n", job.id)
+		if perr := cmd.Process.Kill(); perr != nil {
+			jobslog.Printf("failed to kill process id [%d] of job with id [%s] - errmsg: %v\n", cmd.Process.Pid, job.id, perr)
+		} else {
+			jobslog.Printf("succeeded to kill process id [%d] of job with id [%s]\n", cmd.Process.Pid, job.id)
+		}
+		// leave the select loop.
+		break
+
 	case err = <-done:
 		// task completed before timeout. exit from select loop.
 		break
@@ -309,7 +324,8 @@ func executeJob(job Job, ctx context.Context) {
 		}
 	}
 
-	if err == nil {
+	if err == nil && !stopped {
+		// exited from select loop due to other reason than job stop request.
 		jobslog.Printf("completed processing with success of job with id [%s]\n", job.id)
 		job.issuccess = true
 		// success, exitCode should be 0
@@ -317,11 +333,18 @@ func executeJob(job Job, ctx context.Context) {
 		job.exitcode = ws.ExitStatus()
 	}
 
+	if err == nil && stopped {
+		// exited from select loop due to job stop request.
+		jobslog.Printf("terminated processing due to stop request of job with id [%s]\n", job.id)
+		job.issuccess = true
+		// no exit code for killed process - lets leave it to -1 for reference.
+	}
+
 	// get write lock and add the final state of the job to results map.
 	mapLock.Lock()
 	globalJobsResults[job.id] = &job
 	mapLock.Unlock()
-	jobslog.Printf("save the full result of the execution of job with id [%s]\n", job.id)
+	jobslog.Printf("saved the execution result of job with id [%s]\n", job.id)
 }
 
 // jobsMonitor watches the global jobs queue and spin up a separate executor to handle the task.
@@ -397,6 +420,7 @@ func handleJobsRequests(w http.ResponseWriter, r *http.Request) {
 			exitcode:    -1,
 			errormsg:    "",
 			fetchcount:  0,
+			stop:        make(chan struct{}, 1),
 			memlimit:    memlimit,
 			cpulimit:    cpulimit,
 			submittime:  time.Now().UTC(),
@@ -414,6 +438,68 @@ func handleJobsRequests(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, fmt.Sprintf("|%04d | %-18s | %-14d | %-10d | %-38v | %-20s |", i, job.id, job.memlimit, job.cpulimit, job.submittime, job.task))
 		fmt.Fprintln(w, fmt.Sprintf("+%s-+-%s-+-%s-+-%s-+-%s-+-%s-+", Dashs(4), Dashs(18), Dashs(14), Dashs(10), Dashs(38), Dashs(20)))
 	}
+}
+
+// stopJobsById allows to abort execution of one or multiple submitted jobs which are in running state
+// (so their iscompleted field is false) - triggered for following pattern : /jobs/stop?id=xxx&id=xxx
+func stopJobsById(w http.ResponseWriter, r *http.Request) {
+
+	w.Header().Set("Content-Type", "text/plain; charset=utf8")
+
+	// parse all query strings.
+	query := r.URL.Query()
+	ids, exist := query["id"]
+	if !exist || len(ids) == 0 {
+		// request does not contains query string id.
+		w.WriteHeader(400)
+		w.Write([]byte("\n[+] Hello • The request sent is malformed • The expected format is :\n http://server-ip:8080/jobs/stop?id=xx&id=xx\n"))
+		return
+	}
+	w.WriteHeader(200)
+	w.Write([]byte("\n[+] stopped jobs [non-existent will be ignored] - zoom in to fit the screen\n\n"))
+
+	// format the display table.
+	title := fmt.Sprintf("|%-4s | %-18s | %-14s | %-16s |", "Nb", "Job ID", "Was Running", "Stop Triggered")
+	fmt.Fprintln(w, strings.Repeat("=", len(title)))
+	fmt.Fprintln(w, title)
+	fmt.Fprintf(w, fmt.Sprintf("+%s-+-%s-+-%s-+-%s-+\n", Dashs(4), Dashs(18), Dashs(14), Dashs(16)))
+
+	// retreive each job status and send.
+	i := 0
+	var errorsMessages string
+	mapLock.RLock()
+	for _, id := range ids {
+
+		if match, _ := regexp.MatchString(`[a-z0-9]{16}`, id); !match {
+			// wrong job id format.
+			errorsMessages = errorsMessages + fmt.Sprintf("\n[-] Job ID [%s] is invalid - please make sure to provide the right ID", id)
+			continue
+		}
+
+		job, exist := globalJobsResults[id]
+
+		if !exist {
+			// job id does not exist.
+			errorsMessages = errorsMessages + fmt.Sprintf("\n[-] Job ID [%s] does not exist - maybe wrong id or removed from store\n", id)
+			continue
+		}
+		i += 1
+		if (*job).iscompleted == false {
+			// stream the added job details to user/client.
+			fmt.Fprintln(w, fmt.Sprintf("|%-04d | %-18s | %-14s | %-16s |", i, job.id, "true", "true"))
+			// add value to stop channel to trigger job stop.
+			job.stop <- struct{}{}
+
+		} else {
+			// job already completed (not running).
+			fmt.Fprintln(w, fmt.Sprintf("|%-04d | %-18s | %-14s | %-16s |", i, job.id, "false", "false"))
+		}
+
+		fmt.Fprintf(w, fmt.Sprintf("+%s-+-%s-+-%s-+-%s-+\n", Dashs(4), Dashs(18), Dashs(14), Dashs(16)))
+	}
+	mapLock.RUnlock()
+	// send all errors collected.
+	fmt.Fprintln(w, errorsMessages)
 }
 
 // checkJobsStatusById tells us if one or multiple submitted jobs are either in progress
@@ -469,7 +555,7 @@ func checkJobsStatusById(w http.ResponseWriter, r *http.Request) {
 func getAllJobsStatus(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf8")
 	w.WriteHeader(200)
-	w.Write([]byte("\n[+] status of all current jobs - zoom in to fit the screen\n\n"))
+	w.Write([]byte("\n[+] status of all current jobs [job done with exitcode -1 means stopped] - zoom in to fit the screen\n\n"))
 
 	// format the display table.
 	title := fmt.Sprintf("|%-4s | %-18s | %-6s | %-10s | %-12s | %-10s | %-14s | %-10s | %-38s | %-38s | %-38s | %-20s |", "Nb", "Job ID", "Done", "Success", "Exit Code", "Count", "Memory [MB]", "CPU [%]", "Submitted At", "Started At", "Ended At", "Command Syntax")
@@ -680,7 +766,7 @@ func startDeamon() error {
 	// setup the deamon working directory current folder.
 	cmd.Dir = "."
 	// single file to log output of worker - read by all and write only by the user.
-	workerlog, err := os.OpenFile("worker.log", os.O_APPEND | os.O_CREATE | os.O_WRONLY, 0644)
+	workerlog, err := os.OpenFile("worker.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		fmt.Println("failed to create or open deamon process log file worker.log")
 		return err
@@ -817,9 +903,11 @@ func startWebServer(exit <-chan struct{}) error {
 	router.HandleFunc("/jobs/status", checkJobsStatusById)
 	// expected query string : /jobs/results?id=xxxxx
 	router.HandleFunc("/jobs/results", getJobsResultsById)
-	// expected URI : /jobs/status/ or /jobs/stats
+	// expected URI : /jobs/status/ or /jobs/stats/
 	router.HandleFunc("/jobs/status/", getAllJobsStatus)
 	router.HandleFunc("/jobs/stats/", getAllJobsStatus)
+	// expected query string : /jobs/stop?id=xxx&id=xxx
+	router.HandleFunc("/jobs/stop", stopJobsById)
 
 	webserver := &http.Server{
 		Addr:         address,
@@ -873,7 +961,7 @@ func runDeamon() error {
 		log.Printf("failed to retrieve owner name of this worker process - errmsg: %v", err)
 		// return err
 	}
-		
+
 	log.Printf("started deamon - pid [%d] - user [%s] - ppid [%d]\n", os.Getpid(), user.Username, os.Getppid())
 	// silently remove pid file if deamon exit.
 	defer func() {
