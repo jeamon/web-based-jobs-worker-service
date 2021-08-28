@@ -528,6 +528,7 @@ func checkJobsStatusById(w http.ResponseWriter, r *http.Request) {
 
 	// retreive each job status and send.
 	i := 0
+	var start, end string
 	mapLock.RLock()
 	for _, id := range ids {
 
@@ -543,8 +544,21 @@ func checkJobsStatusById(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		i += 1
+
+		// format time display for zero time values.
+		if (job.starttime).IsZero() {
+			start = "N/A"
+		} else {
+			start = (job.starttime).Format("2006-01-02 15:04:05")
+		}
+
+		if (job.endtime).IsZero() {
+			end = "N/A"
+		} else {
+			end = (job.endtime).Format("2006-01-02 15:04:05")
+		}
 		// stream the added job details to user/client.
-		fmt.Fprintln(w, fmt.Sprintf("|%04d | %-18s | %-6v | %-10v | %-12d | %-10d | %-14d | %-10d | %-38v | %-38v | %-38v | %-20s |", i, job.id, job.iscompleted, job.issuccess, job.exitcode, job.fetchcount, job.memlimit, job.cpulimit, job.submittime, job.starttime, job.endtime, job.task))
+		fmt.Fprintln(w, fmt.Sprintf("|%04d | %-18s | %-6v | %-10v | %-12d | %-10d | %-14d | %-10d | %-38v | %-38v | %-38v | %-20s |", i, job.id, job.iscompleted, job.issuccess, job.exitcode, job.fetchcount, job.memlimit, job.cpulimit, job.submittime, start, end, job.task))
 		fmt.Fprintf(w, fmt.Sprintf("+%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+\n", Dashs(4), Dashs(18), Dashs(6), Dashs(10), Dashs(12), Dashs(10), Dashs(14), Dashs(10), Dashs(38), Dashs(38), Dashs(38), Dashs(20)))
 	}
 	mapLock.RUnlock()
@@ -565,11 +579,24 @@ func getAllJobsStatus(w http.ResponseWriter, r *http.Request) {
 
 	// retreive each job status and send.
 	i := 0
+	var start, end string
 	mapLock.RLock()
 	for _, job := range globalJobsResults {
 		i += 1
+		// format time display for zero time values.
+		if (job.starttime).IsZero() {
+			start = "N/A"
+		} else {
+			start = (job.starttime).Format("2006-01-02 15:04:05")
+		}
+
+		if (job.endtime).IsZero() {
+			end = "N/A"
+		} else {
+			end = (job.endtime).Format("2006-01-02 15:04:05")
+		}
 		// stream the added job details to user/client.
-		fmt.Fprintln(w, fmt.Sprintf("|%04d | %-18s | %-6v | %-10v | %-12d | %-10d | %-14d | %-10d | %-38v | %-38v | %-38v | %-20s |", i, job.id, job.iscompleted, job.issuccess, job.exitcode, job.fetchcount, job.memlimit, job.cpulimit, job.submittime, job.starttime, job.endtime, job.task))
+		fmt.Fprintln(w, fmt.Sprintf("|%04d | %-18s | %-6v | %-10v | %-12d | %-10d | %-14d | %-10d | %-38v | %-38v | %-38v | %-20s |", i, job.id, job.iscompleted, job.issuccess, job.exitcode, job.fetchcount, job.memlimit, job.cpulimit, job.submittime, start, end, job.task))
 		fmt.Fprintf(w, fmt.Sprintf("+%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+\n", Dashs(4), Dashs(18), Dashs(6), Dashs(10), Dashs(12), Dashs(10), Dashs(14), Dashs(10), Dashs(38), Dashs(38), Dashs(38), Dashs(20)))
 	}
 	mapLock.RUnlock()
