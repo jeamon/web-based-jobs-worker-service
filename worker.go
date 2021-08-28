@@ -435,7 +435,7 @@ func handleJobsRequests(w http.ResponseWriter, r *http.Request) {
 		globalJobsQueue <- job
 		jobslog.Printf("added new job with id [%s] to the queue\n", job.id)
 		// stream the added job details to user/client.
-		fmt.Fprintln(w, fmt.Sprintf("|%04d | %-18s | %-14d | %-10d | %-38v | %-20s |", i, job.id, job.memlimit, job.cpulimit, job.submittime, job.task))
+		fmt.Fprintln(w, fmt.Sprintf("|%04d | %-18s | %-14d | %-10d | %-38v | %-20s |", i+1, job.id, job.memlimit, job.cpulimit, job.submittime, job.task))
 		fmt.Fprintln(w, fmt.Sprintf("+%s-+-%s-+-%s-+-%s-+-%s-+-%s-+", Dashs(4), Dashs(18), Dashs(14), Dashs(10), Dashs(38), Dashs(20)))
 	}
 }
@@ -486,13 +486,13 @@ func stopJobsById(w http.ResponseWriter, r *http.Request) {
 		i += 1
 		if (*job).iscompleted == false {
 			// stream the added job details to user/client.
-			fmt.Fprintln(w, fmt.Sprintf("|%-04d | %-18s | %-14s | %-16s |", i, job.id, "true", "true"))
+			fmt.Fprintln(w, fmt.Sprintf("|%04d | %-18s | %-14s | %-16s |", i, job.id, "true", "true"))
 			// add value to stop channel to trigger job stop.
 			job.stop <- struct{}{}
 
 		} else {
 			// job already completed (not running).
-			fmt.Fprintln(w, fmt.Sprintf("|%-04d | %-18s | %-14s | %-16s |", i, job.id, "false", "false"))
+			fmt.Fprintln(w, fmt.Sprintf("|%04d | %-18s | %-14s | %-16s |", i, job.id, "false", "false"))
 		}
 
 		fmt.Fprintf(w, fmt.Sprintf("+%s-+-%s-+-%s-+-%s-+\n", Dashs(4), Dashs(18), Dashs(14), Dashs(16)))
@@ -500,6 +500,43 @@ func stopJobsById(w http.ResponseWriter, r *http.Request) {
 	mapLock.RUnlock()
 	// send all errors collected.
 	fmt.Fprintln(w, errorsMessages)
+}
+
+// stopAllJobs triggers termination of all submitted jobs which are in running state
+// (so their iscompleted field is false) - triggered for following pattern : /jobs/stop/.
+func stopAllJobs(w http.ResponseWriter, r *http.Request) {
+
+	w.Header().Set("Content-Type", "text/plain; charset=utf8")
+
+	w.WriteHeader(200)
+	w.Write([]byte("\n[+] result of stopping all running jobs - zoom in to fit the screen\n\n"))
+
+	// format the display table.
+	title := fmt.Sprintf("|%-4s | %-18s | %-14s | %-16s |", "Nb", "Job ID", "Was Running", "Stop Triggered")
+	fmt.Fprintln(w, strings.Repeat("=", len(title)))
+	fmt.Fprintln(w, title)
+	fmt.Fprintf(w, fmt.Sprintf("+%s-+-%s-+-%s-+-%s-+\n", Dashs(4), Dashs(18), Dashs(14), Dashs(16)))
+
+	// lock the map and iterate over to check each job status
+	// (iscompleted) and fill the stop channel accordingly.
+	i := 0
+	mapLock.RLock()
+	for _, job := range globalJobsResults {
+		i += 1
+		if job.iscompleted == false {
+			// job still running -must be stopped.
+			fmt.Fprintln(w, fmt.Sprintf("|%04d | %-18s | %-14s | %-16s |", i, job.id, "true", "true"))
+			// add value to stop channel to trigger job stop.
+			job.stop <- struct{}{}
+
+		} else {
+			// job already completed (not running).
+			fmt.Fprintln(w, fmt.Sprintf("|%04d | %-18s | %-14s | %-16s |", i, job.id, "false", "false"))
+		}
+
+		fmt.Fprintf(w, fmt.Sprintf("+%s-+-%s-+-%s-+-%s-+\n", Dashs(4), Dashs(18), Dashs(14), Dashs(16)))
+	}
+	mapLock.RUnlock()
 }
 
 // checkJobsStatusById tells us if one or multiple submitted jobs are either in progress
@@ -935,6 +972,8 @@ func startWebServer(exit <-chan struct{}) error {
 	router.HandleFunc("/jobs/stats/", getAllJobsStatus)
 	// expected query string : /jobs/stop?id=xxx&id=xxx
 	router.HandleFunc("/jobs/stop", stopJobsById)
+	// expected query string : /jobs/stop/
+	router.HandleFunc("/jobs/stop/", stopAllJobs)
 
 	webserver := &http.Server{
 		Addr:         address,
