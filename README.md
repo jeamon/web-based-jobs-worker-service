@@ -25,6 +25,7 @@ started - stopped and restarted almost like a unix deamon. Each submitted job co
 unique id. Same approach to check the status. You can even view all submitted jobs status. Finally, you can
 submit a single command and wait until its execution ends in order to view its result output immediately.
 Each start of the worker creates a folder to host all three logs files (web requests - jobs - jobs deletion).
+There is a single log where the worker will persist its standard output and standard error - worker dot log.
 Please feel free to have a look at the [usage section](#usage) for examples.
 
 
@@ -149,13 +150,22 @@ go build -o worker worker.go help.go
 	example: http://127.0.0.1:8080/jobs/stats/
 
 	----------------------------------------------------------------------------------------------
+
+	[6] To stop of one or more submitted running commands (jobs):
+	
+	http://<server-ip-address>:<port>/jobs/stop?id=<job-1-id>&id=<job-2-id>
+
+	[+] On Windows or Linux Operating System.
+	example: http://127.0.0.1:8080/jobs/stop?id=abe478954cef4125&id=cde478910cef4125
+
+	----------------------------------------------------------------------------------------------
 	
 ```
 
 
 ## Upcomings
 
-* add capability to stop one or more running jobs
+* add capability to stop one or more running jobs [DONE]
 * add capability to load configuration details from file at startup
 * add capability to restart one or more submitted jobs
 * add option to store jobs result to redis server rather than in-memory map

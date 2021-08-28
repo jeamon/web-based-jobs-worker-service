@@ -96,4 +96,13 @@ const help = `
 
 	----------------------------------------------------------------------------------------------
 
+	[6] To stop of one or more submitted running commands (jobs):
+	
+	http://<server-ip-address>:<port>/jobs/stop?id=<job-1-id>&id=<job-2-id>
+
+	[+] On Windows or Linux Operating System.
+	example: http://127.0.0.1:8080/jobs/stop?id=abe478954cef4125&id=cde478910cef4125
+
+	----------------------------------------------------------------------------------------------
+
 	`
