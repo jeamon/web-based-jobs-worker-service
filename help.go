@@ -105,4 +105,13 @@ const help = `
 
 	----------------------------------------------------------------------------------------------
 
+	[7] To stop of all submitted running commands (jobs):
+	
+	http://<server-ip-address>:<port>/jobs/stop/
+
+	[+] On Windows or Linux Operating System.
+	example: http://127.0.0.1:8080/jobs/stop/
+
+	----------------------------------------------------------------------------------------------
+
 	`

@@ -22,10 +22,26 @@ to specify single execution timeout for all of the commands submitted. The comma
 from web requests. Each command output will be made available into the system memory for further retrieval.
 Each command submitted is considered as a unique job with unique identifier. This backend service could be
 started - stopped and restarted almost like a unix deamon. Each submitted job could be stopped based on its
-unique id. Same approach to check the status. You can even view all submitted jobs status. Finally, you can
-submit a single command and wait until its execution ends in order to view its result output immediately.
+unique id. Same approach to check the status. You can even view all submitted jobs status or stop them all.
+Finally, you can submit a single command and wait until it completes to view its result output immediately.
 Each start of the worker creates a folder to host all three logs files (web requests - jobs - jobs deletion).
 There is a single log where the worker will persist its standard output and standard error - worker dot log.
+
+* Below is a summary of current available features - this section will be kept update :
+
+01. command-line options to start or stop or restart the worker
+02. command-line option to check the status of the worker service
+03. submit one or several jobs from browser or any web client 
+04. check the status of one or several jobs based on their ids
+05. request the stop one or several jobs based on their ids
+06. fetch the execution result of a singlejob based on its id
+07. request the status of all submitted jobs
+08. request the stop of all running jobs
+09. unique output log folder for each worker startup
+10. single fixed worker log for standard output & error
+11. per startup web server log and jobs log and deletion cron log 
+
+
 Please feel free to have a look at the [usage section](#usage) for examples.
 
 
@@ -160,16 +176,28 @@ go build -o worker worker.go help.go
 
 	----------------------------------------------------------------------------------------------
 	
+	[7] To stop of all submitted running commands (jobs):
+	
+	http://<server-ip-address>:<port>/jobs/stop/
+
+	[+] On Windows or Linux Operating System.
+	example: http://127.0.0.1:8080/jobs/stop/
+
+	----------------------------------------------------------------------------------------------
+	
 ```
 
 
 ## Upcomings
 
-* add capability to stop one or more running jobs [DONE]
+* add filter option to display details of completed or stopped or running jobs
 * add capability to load configuration details from file at startup
 * add capability to restart one or more submitted jobs
 * add option to store jobs result to redis server rather than in-memory map
 * add HTTPS support and option to start HTTP or HTTPS server 
+* add URI and handler to download execution output of one or multiple jobs by ids 
+* add command line options on worker service to list or delete jobs or dump output
+* add feature to move worker service into maintenance mode - stop accepting jobs
 
 
 ## Contribution
