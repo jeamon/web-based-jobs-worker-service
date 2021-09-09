@@ -1,3 +1,3 @@
-module github.com/jeamon/web-based-jobs-worker
+module github.com/jeamon/web-based-jobs-worker-service
 
-go 1.13
+go 1.17
