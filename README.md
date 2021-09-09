@@ -3,6 +3,7 @@
 Cross-platform web & systems backend to execute multiple remote jobs from shell with possibility to specify execution timeout
 and fetch the result output and check one or more jobs status and stop one or more running jobs - all done from web interface. 
 
+* Click to watch the live [demo video](https://youtu.be/_xnINhN8MRI)
 
 
 ## Table of contents
