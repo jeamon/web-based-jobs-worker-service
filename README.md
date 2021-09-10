@@ -8,6 +8,7 @@ and fetch the result output and check one or more jobs status and stop one or mo
 
 ## Table of contents
 * [Description](#description)
+* [Features](#features)
 * [Technologies](#technologies)
 * [Setup](#setup)
 * [Usage](#usage)
@@ -28,20 +29,23 @@ Finally, you can submit a single command and wait until it completes to view its
 Each start of the worker creates a folder to host all three logs files (web requests - jobs - jobs deletion).
 There is a single log where the worker will persist its standard output and standard error - worker dot log.
 
-* Below is a summary of current available features - this section will be kept update :
 
-01. command-line options to start or stop or restart the worker
-02. command-line option to check the status of the worker service
-03. submit one or several jobs from browser or any web client 
-04. check the status of one or several jobs based on their ids
-05. request the stop one or several jobs based on their ids
-06. fetch the execution result of a singlejob based on its id
-07. request the status of all submitted jobs
-08. request the stop of all running jobs
-09. unique output log folder for each worker startup
-10. single fixed worker log for standard output & error
-11. per startup web server log and jobs log and deletion cron log 
-12. https-only local web server with auto-generated self-signed certificate 
+## Features
+
+Below is a summary of current available features. This section will be updated as project continue:
+
+* command-line options to start or stop or restart the worker
+* command-line option to check the status of the worker service
+* submit one or several jobs from browser or any web client 
+* check the status of one or several jobs based on their ids
+* request the stop one or several jobs based on their ids
+* fetch the execution result of a singlejob based on its id
+* request the status of all submitted jobs
+* request the stop of all running jobs
+* unique output log folder for each worker startup
+* single fixed worker log for standard output & error
+* per startup web server log and jobs log and deletion cron log 
+* https-only local web server with auto-generated self-signed certificate 
 
 
 Please feel free to have a look at the [usage section](#usage) for examples.
