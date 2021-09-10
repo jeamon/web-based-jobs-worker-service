@@ -41,6 +41,7 @@ There is a single log where the worker will persist its standard output and stan
 09. unique output log folder for each worker startup
 10. single fixed worker log for standard output & error
 11. per startup web server log and jobs log and deletion cron log 
+12. https-only local web server with auto-generated self-signed certificate 
 
 
 Please feel free to have a look at the [usage section](#usage) for examples.
@@ -57,15 +58,15 @@ This project is developed with:
 ## Setup
 
 On Windows, Linux macOS, and FreeBSD you will be able to download the pre-built binaries once available.
-If your system has [Go >= 1.7](https://golang.org/dl/) you can pull the codebase and build from the source.
+If your system has [Go >= 1.13+](https://golang.org/dl/) you can pull the codebase and build from the source.
 
 ```
-# build the cli-streamer program on windows
-git clone https://github.com/jeamon/web-based-jobs-worker.git && cd web-based-jobs-worker
+# build the worker program on windows
+git clone https://github.com/jeamon/wweb-based-jobs-worker-service.git && cd web-based-jobs-worker-service
 go build -o worker.exe worker.go help.go
 
-# build the cli-streamer program on linux and others
-git clone https://github.com/jeamon/web-based-jobs-worker.git && cd web-based-jobs-worker
+# build the worker program on linux and others
+git clone https://github.com/jeamon/web-based-jobs-worker-service.git && cd web-based-jobs-worker-service
 go build -o worker worker.go help.go
 ```
 
@@ -112,77 +113,77 @@ go build -o worker worker.go help.go
 	
 	[1] To execute a remote command and get instantly the output (replace space with + sign):
 	
-	http://<server-ip-address>:<port>/execute?cmd=<command+argument>
+	https://<server-ip-address>:<port>/execute?cmd=<command+argument>
 	
 	[+] On Windows Operating System.
-	example: http://127.0.0.1:8080/execute?cmd=systeminfo
-	example: http://127.0.0.1:8080/execute?cmd=ipconfig+/all
-	example: http://127.0.0.1:8080/execute?cmd=netstat+-an+|+findstr+ESTAB
+	example: https://127.0.0.1:8080/execute?cmd=systeminfo
+	example: https://127.0.0.1:8080/execute?cmd=ipconfig+/all
+	example: https://127.0.0.1:8080/execute?cmd=netstat+-an+|+findstr+ESTAB
 
 	[+] On Linux Operating System.
-	example: http://127.0.0.1:8080/execute?cmd=ls+-la
-	example: http://127.0.0.1:8080/execute?cmd=ip+a
-	example: http://127.0.0.1:8080/execute?cmd=ps
+	example: https://127.0.0.1:8080/execute?cmd=ls+-la
+	example: https://127.0.0.1:8080/execute?cmd=ip+a
+	example: https://127.0.0.1:8080/execute?cmd=ps
 
 	----------------------------------------------------------------------------------------------
 
 	[2] To submit one or more commands (jobs) for immediate execution and later retreive outputs:
 	
-	http://<server-ip-address>:<port>/jobs?cmd=<command+argument>&cmd=<command+argument>
+	https://<server-ip-address>:<port>/jobs?cmd=<command+argument>&cmd=<command+argument>
 
 	[+] On Windows Operating System.
-	example: http://127.0.0.1:8080/jobs?cmd=systeminfo&cmd=ipconfig+/all&cmd=tasklist
-	example: http://127.0.0.1:8080/jobs?cmd=ipconfig+/all
+	example: https://127.0.0.1:8080/jobs?cmd=systeminfo&cmd=ipconfig+/all&cmd=tasklist
+	example: https://127.0.0.1:8080/jobs?cmd=ipconfig+/all
 
 	[+] On Linux Operating System.
-	example: http://127.0.0.1:8080/jobs?cmd=ls+-la&cmd=ip+a&cmd=ps
+	example: https://127.0.0.1:8080/jobs?cmd=ls+-la&cmd=ip+a&cmd=ps
 
 	----------------------------------------------------------------------------------------------
 
 	[3] To check the detailed status of one or more submitted commands (jobs):
 	
-	http://<server-ip-address>:<port>/jobs/status?id=<job-1-id>&id=<job-2-id>
+	https://<server-ip-address>:<port>/jobs/status?id=<job-1-id>&id=<job-2-id>
 
 	[+] On Windows or Linux Operating System.
-	example: http://127.0.0.1:8080/jobs/status?id=abe478954cef4125&id=cde478910cef4125
+	example: https://127.0.0.1:8080/jobs/status?id=abe478954cef4125&id=cde478910cef4125
 
 	----------------------------------------------------------------------------------------------
 
 	[4] To fetch the output of one command (job) submitted:
 	
-	http://<server-ip-address>:<port>/jobs/results?id=<job-id>
+	https://<server-ip-address>:<port>/jobs/results?id=<job-id>
 
 	[+] On Windows or Linux Operating System.
-	example: http://127.0.0.1:8080/jobs/results?id=abe478954cef4125
+	example: https://127.0.0.1:8080/jobs/results?id=abe478954cef4125
 
 	----------------------------------------------------------------------------------------------
 
 	[5] To check the status of all submitted commands (jobs):
 	
-	http://<server-ip-address>:<port>/jobs/status/
-	http://<server-ip-address>:<port>/jobs/stats/
+	https://<server-ip-address>:<port>/jobs/status/
+	https://<server-ip-address>:<port>/jobs/stats/
 
 	[+] On Windows or Linux Operating System.
-	example: http://127.0.0.1:8080/jobs/status/
-	example: http://127.0.0.1:8080/jobs/stats/
+	example: https://127.0.0.1:8080/jobs/status/
+	example: https://127.0.0.1:8080/jobs/stats/
 
 	----------------------------------------------------------------------------------------------
 
 	[6] To stop of one or more submitted running commands (jobs):
 	
-	http://<server-ip-address>:<port>/jobs/stop?id=<job-1-id>&id=<job-2-id>
+	https://<server-ip-address>:<port>/jobs/stop?id=<job-1-id>&id=<job-2-id>
 
 	[+] On Windows or Linux Operating System.
-	example: http://127.0.0.1:8080/jobs/stop?id=abe478954cef4125&id=cde478910cef4125
+	example: https://127.0.0.1:8080/jobs/stop?id=abe478954cef4125&id=cde478910cef4125
 
 	----------------------------------------------------------------------------------------------
 	
 	[7] To stop of all submitted running commands (jobs):
 	
-	http://<server-ip-address>:<port>/jobs/stop/
+	https://<server-ip-address>:<port>/jobs/stop/
 
 	[+] On Windows or Linux Operating System.
-	example: http://127.0.0.1:8080/jobs/stop/
+	example: https://127.0.0.1:8080/jobs/stop/
 
 	----------------------------------------------------------------------------------------------
 	
@@ -193,9 +194,8 @@ go build -o worker worker.go help.go
 
 * add filter option to display details of completed or stopped or running jobs
 * add capability to load configuration details from file at startup
-* add capability to restart one or more submitted jobs
+* add capability to restart one or more submitted jobs while keeping their ids
 * add option to store jobs result to redis server rather than in-memory map
-* add HTTPS support and option to start HTTP or HTTPS server 
 * add URI and handler to download execution output of one or multiple jobs by ids 
 * add command line options on worker service to list or delete jobs or dump output
 * add feature to move worker service into maintenance mode - stop accepting jobs

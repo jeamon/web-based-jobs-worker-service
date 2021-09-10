@@ -40,77 +40,77 @@ const help = `
 	
 	[1] To execute a remote command and get instantly the output (replace space with + sign):
 	
-	http://<server-ip-address>:<port>/execute?cmd=<command+argument>
+	https://<server-ip-address>:<port>/execute?cmd=<command+argument>
 	
 	[+] On Windows Operating System.
-	example: http://127.0.0.1:8080/execute?cmd=systeminfo
-	example: http://127.0.0.1:8080/execute?cmd=ipconfig+/all
-	example: http://127.0.0.1:8080/execute?cmd=netstat+-an+|+findstr+ESTAB
+	example: https://127.0.0.1:8080/execute?cmd=systeminfo
+	example: https://127.0.0.1:8080/execute?cmd=ipconfig+/all
+	example: https://127.0.0.1:8080/execute?cmd=netstat+-an+|+findstr+ESTAB
 
 	[+] On Linux Operating System.
-	example: http://127.0.0.1:8080/execute?cmd=ls+-la
-	example: http://127.0.0.1:8080/execute?cmd=ip+a
-	example: http://127.0.0.1:8080/execute?cmd=ps
+	example: https://127.0.0.1:8080/execute?cmd=ls+-la
+	example: https://127.0.0.1:8080/execute?cmd=ip+a
+	example: https://127.0.0.1:8080/execute?cmd=ps
 
 	----------------------------------------------------------------------------------------------
 
 	[2] To submit one or more commands (jobs) for immediate execution and later retreive outputs:
 	
-	http://<server-ip-address>:<port>/jobs?cmd=<command+argument>&cmd=<command+argument>
+	https://<server-ip-address>:<port>/jobs?cmd=<command+argument>&cmd=<command+argument>
 
 	[+] On Windows Operating System.
-	example: http://127.0.0.1:8080/jobs?cmd=systeminfo&cmd=ipconfig+/all&cmd=tasklist
-	example: http://127.0.0.1:8080/jobs?cmd=ipconfig+/all
+	example: https://127.0.0.1:8080/jobs?cmd=systeminfo&cmd=ipconfig+/all&cmd=tasklist
+	example: https://127.0.0.1:8080/jobs?cmd=ipconfig+/all
 
 	[+] On Linux Operating System.
-	example: http://127.0.0.1:8080/jobs?cmd=ls+-la&cmd=ip+a&cmd=ps
+	example: https://127.0.0.1:8080/jobs?cmd=ls+-la&cmd=ip+a&cmd=ps
 
 	----------------------------------------------------------------------------------------------
 
 	[3] To check the detailed status of one or more submitted commands (jobs):
 	
-	http://<server-ip-address>:<port>/jobs/status?id=<job-1-id>&id=<job-2-id>
+	https://<server-ip-address>:<port>/jobs/status?id=<job-1-id>&id=<job-2-id>
 
 	[+] On Windows or Linux Operating System.
-	example: http://127.0.0.1:8080/jobs/status?id=abe478954cef4125&id=cde478910cef4125
+	example: https://127.0.0.1:8080/jobs/status?id=abe478954cef4125&id=cde478910cef4125
 
 	----------------------------------------------------------------------------------------------
 
 	[4] To fetch the output of one command (job) submitted:
 	
-	http://<server-ip-address>:<port>/jobs/results?id=<job-id>
+	https://<server-ip-address>:<port>/jobs/results?id=<job-id>
 
 	[+] On Windows or Linux Operating System.
-	example: http://127.0.0.1:8080/jobs/results?id=abe478954cef4125
+	example: https://127.0.0.1:8080/jobs/results?id=abe478954cef4125
 
 	----------------------------------------------------------------------------------------------
 
 	[5] To check the status of all submitted commands (jobs):
 	
-	http://<server-ip-address>:<port>/jobs/status/
-	http://<server-ip-address>:<port>/jobs/stats/
+	https://<server-ip-address>:<port>/jobs/status/
+	https://<server-ip-address>:<port>/jobs/stats/
 
 	[+] On Windows or Linux Operating System.
-	example: http://127.0.0.1:8080/jobs/status/
-	example: http://127.0.0.1:8080/jobs/stats/
+	example: https://127.0.0.1:8080/jobs/status/
+	example: https://127.0.0.1:8080/jobs/stats/
 
 	----------------------------------------------------------------------------------------------
 
 	[6] To stop of one or more submitted running commands (jobs):
 	
-	http://<server-ip-address>:<port>/jobs/stop?id=<job-1-id>&id=<job-2-id>
+	https://<server-ip-address>:<port>/jobs/stop?id=<job-1-id>&id=<job-2-id>
 
 	[+] On Windows or Linux Operating System.
-	example: http://127.0.0.1:8080/jobs/stop?id=abe478954cef4125&id=cde478910cef4125
+	example: https://127.0.0.1:8080/jobs/stop?id=abe478954cef4125&id=cde478910cef4125
 
 	----------------------------------------------------------------------------------------------
 
 	[7] To stop of all submitted running commands (jobs):
 	
-	http://<server-ip-address>:<port>/jobs/stop/
+	https://<server-ip-address>:<port>/jobs/stop/
 
 	[+] On Windows or Linux Operating System.
-	example: http://127.0.0.1:8080/jobs/stop/
+	example: https://127.0.0.1:8080/jobs/stop/
 
 	----------------------------------------------------------------------------------------------
 

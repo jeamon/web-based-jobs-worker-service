@@ -13,3 +13,6 @@
 
 # Ignore any upcoming feature which deals with env file
 .env
+
+# Ignore the server certificate folder
+certs

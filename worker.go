@@ -4,9 +4,16 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"crypto/rsa"
+	"crypto/tls"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
 	"fmt"
 	"io/ioutil"
 	"log"
+	"math/big"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -35,7 +42,11 @@ import (
 // Author   : Jerome AMON
 // Created  : 20 August 2021
 
-const address = "0.0.0.0:8080"
+const address = "127.0.0.1:8080"
+
+// fixed path of server certs & private key.
+const serverCertsPath = "certs/server.crt"
+const serverPrivKeyPath = "certs/server.key"
 
 // waiting time before program exit at failure.
 const waitingTime = 3
@@ -953,7 +964,164 @@ func logRequestMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+// createCertsFolder makes sure that "certs" if present - if not create it.
+func createCertsFolder() {
+	info, err := os.Stat("certs")
+	if !os.IsExist(err) {
+		// path does not exist.
+		err := os.Mkdir("certs", 0755)
+		if err != nil {
+			log.Printf("failed create %q folder - errmsg : %v\n", "certs", err)
+			os.Exit(1)
+		}
+	} else {
+		// path already exists but could be file or directory.
+		if !info.IsDir() {
+			log.Printf("path %q exists but it is not a folder so please check before continue - errmsg : %v\n", "certs", err)
+			os.Exit(0)
+		}
+	}
+}
+
+// generateServerCertificate builds self-signed certificate and rsa-based keys then returns their pem-encoded
+// format after has saved them on disk. It aborts the program if any failure during the process.
+func generateServerCertificate() ([]byte, []byte) {
+	log.Println("generating new self-signed server's certificate and private key")
+	// if not present create folder named "certs" to store server's certs & key.
+	createCertsFolder()
+	// https://pkg.go.dev/crypto/x509#Certificate
+	serverCerts := &x509.Certificate{
+		SignatureAlgorithm: x509.SHA256WithRSA,
+		PublicKeyAlgorithm: x509.RSA,
+		// generate a random serial number
+		SerialNumber: big.NewInt(2021),
+		// define the PKIX (Internet Public Key Infrastructure Using X.509).
+		// fill each field with the right information based on your context.
+		Subject: pkix.Name{
+			Organization:  []string{"My Company"},
+			Country:       []string{"My Country"},
+			Province:      []string{"My City"},
+			Locality:      []string{"My Locality"},
+			StreetAddress: []string{"My Street Address"},
+			PostalCode:    []string{"00000"},
+			CommonName: "localhost",
+		},
+
+		NotBefore: time.Now(),
+		// make it valid for 1 year.
+		NotAfter: time.Now().AddDate(1, 0, 0),
+		// self-signed certificate.
+		IsCA:                  true,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		KeyUsage:              x509.KeyUsageDigitalSignature,
+		BasicConstraintsValid: true,
+		// enter the right email address here.
+		EmailAddresses: []string{"my-email@mydomainname"},
+		// in upcoming release, server could start with user-defined ip or dnsname so these
+		// below two fields will be dynamically filled. For now, this server runs locally.
+		IPAddresses: []net.IP{net.IPv4(127, 0, 0, 1), net.IPv6loopback},
+		DNSNames:    []string{"localhost"},
+	}
+
+	// generate a public & private key for the certificate.
+	serverPrivKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		log.Printf("failed to generate server private key - errmsg : %v\n", err)
+		os.Exit(1)
+	}
+
+	log.Println("successfully created rsa-based key for server certificate.")
+
+	// pem encode the private key.
+	serverPrivKeyPEM := new(bytes.Buffer)
+	err = pem.Encode(serverPrivKeyPEM, &pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: x509.MarshalPKCS1PrivateKey(serverPrivKey),
+	})
+
+	if err != nil {
+		log.Printf("failed to pem encode server private key - errmsg : %v\n", err)
+		os.Exit(2)
+	}
+
+	// dump CA private key into a file.
+	if err := os.WriteFile(serverPrivKeyPath, serverPrivKeyPEM.Bytes(), 0644); err != nil {
+		log.Printf("failed to save on disk the server private key - errmsg : %v\n", err)
+		os.Exit(1)
+	}
+
+	log.Println("successfully pem encoded and saved server's private key.")
+
+	// create the server certificate. https://pkg.go.dev/crypto/x509#CreateCertificate
+	serverCertsBytes, err := x509.CreateCertificate(rand.Reader, serverCerts, serverCerts, &serverPrivKey.PublicKey, serverPrivKey)
+	if err != nil {
+		log.Printf("failed to create server certificate - errmsg : %v\n", err)
+		os.Exit(1)
+	}
+
+	log.Println("successfully created server certificate.")
+
+	// pem encode the certificate.
+	serverCertsPEM := new(bytes.Buffer)
+	err = pem.Encode(serverCertsPEM, &pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: serverCertsBytes,
+	})
+
+	if err != nil {
+		log.Printf("failed to pem encode server certificate - errmsg : %v\n", err)
+		os.Exit(2)
+	}
+
+	// dump certificate into a file.
+	if err := os.WriteFile(serverCertsPath, serverCertsPEM.Bytes(), 0644); err != nil {
+		log.Printf("failed to save on disk the server certificate - errmsg : %v\n", err)
+		os.Exit(1)
+	}
+
+	log.Println("successfully pem encoded and saved server's certificate.")
+
+	return serverCertsPEM.Bytes(), serverPrivKeyPEM.Bytes()
+}
+
 func startWebServer(exit <-chan struct{}) error {
+
+	// we try to load server certificate and key from disk.
+	serverTLSCerts, err := tls.LoadX509KeyPair(serverCertsPath, serverPrivKeyPath)
+	if err != nil {
+		// if it fails for some reasons - we rebuild new certificate and key.
+		log.Printf("failed to load server's certificate and key from disk - errmsg : %v", err)
+		// rebuild self-signed certs and constructs server TLS certificate.
+		serverTLSCerts, err = tls.X509KeyPair(generateServerCertificate())
+		if err != nil {
+			log.Printf("failed to load server's pem-encoded certificate and key - errmsg : %v\n", err)
+			os.Exit(1)
+		}
+	}
+
+	// build server TLS configurations - https://pkg.go.dev/crypto/tls#Config
+	tlsConfig := &tls.Config{
+		// handshake with minimum TLS 1.2. MaxVersion is 1.3.
+		MinVersion: tls.VersionTLS12,
+		// server certificates (key with self-signed certs).
+		Certificates: []tls.Certificate{serverTLSCerts},
+		// elliptic curves that will be used in an ECDHE handshake, in preference order.
+		CurvePreferences: []tls.CurveID{tls.CurveP521, tls.X25519, tls.CurveP256},
+		// CipherSuites is a list of enabled TLS 1.0–1.2 cipher suites. The order of
+		// the list is ignored. Note that TLS 1.3 ciphersuites are not configurable.
+		CipherSuites: []uint16{
+			// TLS v1.2 - ECDSA-based keys cipher suites.
+			tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+			tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+			// TLS v1.2 - RSA-based keys cipher suites.
+			tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+			tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+			// TLS v1.3 - some strong cipher suites.
+			tls.TLS_AES_256_GCM_SHA384,
+			tls.TLS_CHACHA20_POLY1305_SHA256,
+			tls.TLS_AES_128_GCM_SHA256,
+		},
+	}
 
 	// start the web server.
 	router := http.NewServeMux()
@@ -982,6 +1150,7 @@ func startWebServer(exit <-chan struct{}) error {
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 15 * time.Second,
 		IdleTimeout:  60 * time.Second,
+		TLSConfig:    tlsConfig,
 	}
 
 	// goroutine in charge of shutting down the server when triggered.
@@ -1005,15 +1174,15 @@ func startWebServer(exit <-chan struct{}) error {
 		}
 
 		// err = nil - successfully shutdown the server.
-		log.Printf("the web server was successfully shutdown down.")
+		log.Println("the web server was successfully shutdown down.")
 
 	}()
 
 	// make listen on all interfaces - helps on container binding
 	// if shutdown error will be http.ErrServerClosed.
-	log.Printf("starting http web server on %s ...\n", address)
+	log.Printf("starting https only web server on %s ...\n", address)
 	weblog.Printf("starting web server at %s\n", address)
-	if err := webserver.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+	if err := webserver.ListenAndServeTLS("", ""); err != nil && err != http.ErrServerClosed {
 		log.Fatalf("failed to start the web server on %s - errmsg: %v\n", address, err)
 		return err
 	}
