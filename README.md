@@ -25,6 +25,8 @@ from web requests. Each command output will be made available into the system me
 Each command submitted is considered as a unique job with unique identifier. This backend service could be
 started - stopped and restarted almost like a unix deamon. Each submitted job could be stopped based on its
 unique id. Same approach to check the status. You can even view all submitted jobs status or stop them all.
+It is also possible to restart immediately one or multiple or all completed jobs. For not yet completed jobs
+restart call will trigger these jobs to stop before. Then you will need to call restart again on them.
 Finally, you can submit a single command and wait until it completes to view its result output immediately.
 Each start of the worker creates a folder to host all three logs files (web requests - jobs - jobs deletion).
 There is a single log where the worker will persist its standard output and standard error - worker dot log.
@@ -46,6 +48,7 @@ Below is a summary of current available features. This section will be updated a
 * single fixed worker log for standard output & error
 * per startup web server log and jobs log and deletion cron log 
 * https-only local web server with auto-generated self-signed certificate 
+* capability to restart one or more jobs by their ids or restart all jobs
 
 
 Please feel free to have a look at the [usage section](#usage) for examples.
@@ -191,14 +194,32 @@ go build -o worker worker.go help.go
 
 	----------------------------------------------------------------------------------------------
 	
+	[8] To restart one or more submitted commands (jobs):
+	
+	https://<server-ip-address>:<port>/jobs/restart?id=<job-1-id>&id=<job-2-id>
+
+	[+] On Windows or Linux Operating System.
+	example: https://127.0.0.1:8080/jobs/restart?id=abe478954cef4125&id=cde478910cef4125
+
+	----------------------------------------------------------------------------------------------
+
+	[9] To restart all submitted commands (jobs):
+	
+	https://<server-ip-address>:<port>/jobs/restart/
+
+	[+] On Windows or Linux Operating System.
+	example: https://127.0.0.1:8080/jobs/restart/
+
+	----------------------------------------------------------------------------------------------
+	
 ```
 
 
 ## Upcomings
 
 * add filter option to display details of completed or stopped or running jobs
+* add filter & order options into /jobs/status/ URI to sort by submit or start or end time
 * add capability to load configuration details from file at startup
-* add capability to restart one or more submitted jobs while keeping their ids
 * add option to store jobs result to redis server rather than in-memory map
 * add URI and handler to download execution output of one or multiple jobs by ids 
 * add command line options on worker service to list or delete jobs or dump output
