@@ -629,7 +629,7 @@ func restartAllJobs(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintln(w, title)
 	fmt.Fprintf(w, fmt.Sprintf("+%s-+-%s-+-%s-+-%s-+-%s-+\n", Dashs(4), Dashs(18), Dashs(14), Dashs(16), Dashs(12)))
 
-	// lock the map and iterate over to check each job status (iscompleted) 
+	// lock the map and iterate over to check each job status (iscompleted)
 	// and fill the stop channel accordingly or add job to processing queue.
 	i := 0
 	wg := &sync.WaitGroup{}
@@ -666,7 +666,7 @@ func restartAllJobs(w http.ResponseWriter, r *http.Request) {
 
 // resetCompletedJobInfos resets a given job details (only if it has been completed/stopped before) for restarting.
 func resetCompletedJobInfos(j *Job) bool {
-	if 	j.iscompleted {
+	if j.iscompleted {
 		j.pid = 0
 		j.iscompleted, j.issuccess = false, false
 		j.exitcode = -1
@@ -1036,24 +1036,33 @@ func stopDeamon() error {
 	}
 }
 
-// setupLoggers create a log folder and configure all files needed for logging.
+// setupLoggers ensures the log folder exist and configures all files needed for logging.
 func setupLoggers() {
-	starttime := time.Now() //== get current launch time
-	logtime := fmt.Sprintf("%d%02d%02d-%02d%02d%02d", starttime.Year(), starttime.Month(), starttime.Day(), starttime.Hour(), starttime.Minute(), starttime.Second())
-
-	// create dedicated log folder for each launch of the program.
-	logfolder := fmt.Sprintf("%s-log", logtime)
-	if err := os.Mkdir(logfolder, 0755); err != nil {
-		fmt.Printf(" [-] Program aborted. failed to create the dedicated log folder - Errmsg: %v", err)
-		time.Sleep(waitingTime * time.Second)
-		os.Exit(1)
+	// build log folder based on current launch day.
+	logfolder := fmt.Sprintf("%d%02d%02d.logs", time.Now().Year(), time.Now().Month(), time.Now().Day())
+	// use current day's log folder to store all logs files. if not exists, create it.
+	info, err := os.Stat(logfolder)
+	if !os.IsExist(err) {
+		// folder does not exist.
+		err := os.Mkdir(logfolder, 0755)
+		if err != nil {
+			fmt.Printf(" [-] Program aborted. failed to create %q logging folder - errmsg: %v", logfolder, err)
+			time.Sleep(waitingTime * time.Second)
+			os.Exit(1)
+		}
+	} else {
+		// folder already exists abort if not a directory.
+		if !info.IsDir() {
+			log.Printf("%q already exists but it is not a folder so check before continue - errmsg : %v\n", logfolder, err)
+			os.Exit(0)
+		}
 	}
 
 	// create the log file for web server requests.
 	logfile, err := os.OpenFile(logfolder+string(os.PathSeparator)+"web.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
 	if err != nil {
-		fmt.Printf(" [*] Program aborted // failed to create requests log file - errmsg // ", err)
-		time.Sleep(3 * time.Second)
+		fmt.Printf(" [*] Program aborted // failed to create requests log file - errmsg : %v\n", err)
+		time.Sleep(waitingTime * time.Second)
 		os.Exit(1)
 	}
 
@@ -1063,8 +1072,8 @@ func setupLoggers() {
 	// create file to log deleted jobs by cleanupMapResults goroutine.
 	deletedjobslogfile, err := os.OpenFile(logfolder+string(os.PathSeparator)+"deleted.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
 	if err != nil {
-		fmt.Printf(" [*] Program aborted // failed to create jobs deletion log file - errmsg // ", err)
-		time.Sleep(3 * time.Second)
+		fmt.Printf(" [*] Program aborted // failed to create jobs deletion log file - errmsg : %v\n", err)
+		time.Sleep(waitingTime * time.Second)
 		os.Exit(1)
 	}
 
@@ -1074,14 +1083,14 @@ func setupLoggers() {
 	// create file to log jobs related activities.
 	jobslogfile, err := os.OpenFile(logfolder+string(os.PathSeparator)+"jobs.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
 	if err != nil {
-		fmt.Printf(" [*] Program aborted // failed to create jobs processing log file - errmsg // ", err)
-		time.Sleep(3 * time.Second)
+		fmt.Printf(" [*] Program aborted // failed to create jobs processing log file - errmsg : %v\n", err)
+		time.Sleep(waitingTime * time.Second)
 		os.Exit(1)
 	}
 
 	// setup logging format and parameters.
 	jobslog = log.New(jobslogfile, "[ INFOS ] ", log.LstdFlags|log.Lshortfile)
-	log.Println("all log files successfully setup ...")
+	log.Println("log folder and all log files successfully setup ...")
 }
 
 // logRequestMiddleware is middleware that logs incoming request details.
@@ -1133,7 +1142,7 @@ func generateServerCertificate() ([]byte, []byte) {
 			Locality:      []string{"My Locality"},
 			StreetAddress: []string{"My Street Address"},
 			PostalCode:    []string{"00000"},
-			CommonName: "localhost",
+			CommonName:    "localhost",
 		},
 
 		NotBefore: time.Now(),
