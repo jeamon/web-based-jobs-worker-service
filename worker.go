@@ -550,6 +550,135 @@ func stopAllJobs(w http.ResponseWriter, r *http.Request) {
 	mapLock.RUnlock()
 }
 
+// restartJobsById allows to restart execution of one or multiple submitted jobs. If the job is in completed state
+// it get restarted immediately. if it is in running state, the stop will just be triggered so user can restart it
+// later. This is the URI to trigger this handler function: /jobs/restart?id=xxx&id=xxx
+func restartJobsById(w http.ResponseWriter, r *http.Request) {
+
+	w.Header().Set("Content-Type", "text/plain; charset=utf8")
+
+	// parse all query strings.
+	query := r.URL.Query()
+	ids, exist := query["id"]
+	if !exist || len(ids) == 0 {
+		// request does not contains query string id.
+		w.WriteHeader(400)
+		w.Write([]byte("\n[+] Hello • The request sent is malformed • The expected format is :\n https://server-ip:8080/jobs/restart?id=xx&id=xx\n"))
+		return
+	}
+	w.WriteHeader(200)
+	w.Write([]byte("\n[+] restart summary - retry or check status for not restarted jobs. zoom in to fit the screen\n\n"))
+
+	// format the display table.
+	title := fmt.Sprintf("|%-4s | %-18s | %-14s | %-16s | %-12s |", "Nb", "Job ID", "Was Running", "Stop Triggered", "Restarted")
+	fmt.Fprintln(w, strings.Repeat("=", len(title)))
+	fmt.Fprintln(w, title)
+	fmt.Fprintf(w, fmt.Sprintf("+%s-+-%s-+-%s-+-%s-+-%s-+\n", Dashs(4), Dashs(18), Dashs(14), Dashs(16), Dashs(12)))
+
+	i := 0
+	var errorsMessages string
+	for _, id := range ids {
+
+		if match, _ := regexp.MatchString(`[a-z0-9]{16}`, id); !match {
+			// wrong job id format.
+			errorsMessages = errorsMessages + fmt.Sprintf("\n[-] Job ID [%s] is invalid - please make sure to provide the right ID", id)
+			continue
+		}
+		mapLock.RLock()
+		job, exist := globalJobsResults[id]
+		mapLock.RUnlock()
+
+		if !exist {
+			// job id does not exist.
+			errorsMessages = errorsMessages + fmt.Sprintf("\n[-] Job ID [%s] does not exist - maybe wrong id or removed from store\n", id)
+			continue
+		}
+		i += 1
+		if job.iscompleted == false {
+			// job is still running. add value to stop channel to trigger job stop.
+			job.stop <- struct{}{}
+			jobslog.Printf("restarting - only stop triggered for old job with id [%s]\n", job.id)
+			fmt.Fprintln(w, fmt.Sprintf("|%04d | %-18s | %-14s | %-16s | %-12s |", i, job.id, "yes", "yes", "n/a"))
+
+		} else {
+			// job already completed (not running). reset and start it by adding to jobs queue.
+			mapLock.Lock()
+			_ = resetCompletedJobInfos(job)
+			mapLock.Unlock()
+			globalJobsQueue <- *job
+			jobslog.Printf("restarting - added old job with id [%s] to the queue\n", job.id)
+			fmt.Fprintln(w, fmt.Sprintf("|%04d | %-18s | %-14s | %-16s | %-12s |", i, job.id, "no", "n/a", "yes"))
+		}
+
+		fmt.Fprintf(w, fmt.Sprintf("+%s-+-%s-+-%s-+-%s-+-%s-+\n", Dashs(4), Dashs(18), Dashs(14), Dashs(16), Dashs(12)))
+	}
+	// send all errors collected.
+	fmt.Fprintln(w, errorsMessages)
+}
+
+// restartAllJobs triggers termination of all running jobs and immediate start of all completed jobs.
+func restartAllJobs(w http.ResponseWriter, r *http.Request) {
+
+	w.Header().Set("Content-Type", "text/plain; charset=utf8")
+	w.WriteHeader(200)
+	w.Write([]byte("\n[+] restart summary - retry or check status for not restarted jobs. zoom in to fit the screen\n\n"))
+
+	// format the display table.
+	title := fmt.Sprintf("|%-4s | %-18s | %-14s | %-16s | %-12s |", "Nb", "Job ID", "Was Running", "Stop Triggered", "Restarted")
+	fmt.Fprintln(w, strings.Repeat("=", len(title)))
+	fmt.Fprintln(w, title)
+	fmt.Fprintf(w, fmt.Sprintf("+%s-+-%s-+-%s-+-%s-+-%s-+\n", Dashs(4), Dashs(18), Dashs(14), Dashs(16), Dashs(12)))
+
+	// lock the map and iterate over to check each job status (iscompleted) 
+	// and fill the stop channel accordingly or add job to processing queue.
+	i := 0
+	wg := &sync.WaitGroup{}
+	mapLock.RLock()
+	for _, job := range globalJobsResults {
+		i += 1
+		if job.iscompleted == false {
+			// job is still running. add value to stop channel to trigger job stop.
+			job.stop <- struct{}{}
+			jobslog.Printf("restarting - only stop triggered for old job with id [%s]\n", job.id)
+			fmt.Fprintln(w, fmt.Sprintf("|%04d | %-18s | %-14s | %-16s | %-12s |", i, job.id, "yes", "yes", "n/a"))
+
+		} else {
+			// job already completed (not running). so reset and
+			// start it by adding to jobs queue in parallel.
+			wg.Add(1)
+			go func() {
+				mapLock.Lock()
+				_ = resetCompletedJobInfos(job)
+				mapLock.Unlock()
+				globalJobsQueue <- *job
+				jobslog.Printf("restarting - added old job with id [%s] to the queue\n", job.id)
+				wg.Done()
+			}()
+
+			fmt.Fprintln(w, fmt.Sprintf("|%04d | %-18s | %-14s | %-16s | %-12s |", i, job.id, "no", "n/a", "yes"))
+		}
+		fmt.Fprintf(w, fmt.Sprintf("+%s-+-%s-+-%s-+-%s-+-%s-+\n", Dashs(4), Dashs(18), Dashs(14), Dashs(16), Dashs(12)))
+	}
+	mapLock.RUnlock()
+	// wait until all goroutines done.
+	wg.Wait()
+}
+
+// resetCompletedJobInfos resets a given job details (only if it has been completed/stopped before) for restarting.
+func resetCompletedJobInfos(j *Job) bool {
+	if 	j.iscompleted {
+		j.pid = 0
+		j.iscompleted, j.issuccess = false, false
+		j.exitcode = -1
+		j.errormsg = ""
+		j.stop = make(chan struct{}, 1)
+		j.starttime, j.endtime = time.Time{}, time.Time{}
+		return true
+	}
+
+	return false
+}
+
 // checkJobsStatusById tells us if one or multiple submitted jobs are either in progress
 // or terminated or do not exist. triggered for following request : /jobs/status?id=xx&id=xx
 func checkJobsStatusById(w http.ResponseWriter, r *http.Request) {
@@ -1142,6 +1271,10 @@ func startWebServer(exit <-chan struct{}) error {
 	router.HandleFunc("/jobs/stop", stopJobsById)
 	// expected query string : /jobs/stop/
 	router.HandleFunc("/jobs/stop/", stopAllJobs)
+	// expected query string : /jobs/restart?id=xxx&id=xxx
+	router.HandleFunc("/jobs/restart", restartJobsById)
+	// expected query string : /jobs/restart/
+	router.HandleFunc("/jobs/restart/", restartAllJobs)
 
 	webserver := &http.Server{
 		Addr:         address,

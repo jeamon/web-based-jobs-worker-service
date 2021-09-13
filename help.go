@@ -114,4 +114,22 @@ const help = `
 
 	----------------------------------------------------------------------------------------------
 
+	[8] To restart one or more submitted commands (jobs):
+	
+	https://<server-ip-address>:<port>/jobs/restart?id=<job-1-id>&id=<job-2-id>
+
+	[+] On Windows or Linux Operating System.
+	example: https://127.0.0.1:8080/jobs/restart?id=abe478954cef4125&id=cde478910cef4125
+
+	----------------------------------------------------------------------------------------------
+
+	[9] To restart all submitted commands (jobs):
+	
+	https://<server-ip-address>:<port>/jobs/restart/
+
+	[+] On Windows or Linux Operating System.
+	example: https://127.0.0.1:8080/jobs/restart/
+
+	----------------------------------------------------------------------------------------------
+
 	`
