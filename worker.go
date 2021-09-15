@@ -88,7 +88,7 @@ type Job struct {
 	errormsg    string
 	fetchcount  int
 	stop        chan struct{}
-	result      bytes.Buffer
+	result      *bytes.Buffer
 	submittime  time.Time
 	starttime   time.Time
 	endtime     time.Time
@@ -98,7 +98,7 @@ type Job struct {
 const maxJobs = 10
 
 // buffered (maxJobs) channel to hold submitted (*job).
-var globalJobsQueue chan Job
+var globalJobsQueue chan *Job
 
 // store all submitted jobs after processed with job id as key.
 var globalJobsResults map[string]*Job
@@ -106,7 +106,7 @@ var mapLock *sync.RWMutex
 
 func initializer() {
 	mapLock = &sync.RWMutex{}
-	globalJobsQueue = make(chan Job, maxJobs)
+	globalJobsQueue = make(chan *Job, maxJobs)
 	if globalJobsResults == nil {
 		globalJobsResults = make(map[string]*Job)
 	}
@@ -230,7 +230,7 @@ func Dashs(count int) string {
 }
 
 // executeJob takes a job structure and will execute the task and add the result to the global results bus.
-func executeJob(job Job, ctx context.Context) {
+func executeJob(job *Job, ctx context.Context) {
 	job.starttime = time.Now().UTC()
 
 	jobctx := ctx
@@ -251,7 +251,7 @@ func executeJob(job Job, ctx context.Context) {
 	}
 
 	// set the job result field for combined output.
-	cmd.Stdout, cmd.Stderr = &job.result, &job.result
+	cmd.Stdout, cmd.Stderr = job.result, job.result
 
 	// asynchronous start
 	if err := cmd.Start(); err != nil {
@@ -261,9 +261,9 @@ func executeJob(job Job, ctx context.Context) {
 		job.issuccess = false
 		job.errormsg = err.Error()
 		job.iscompleted = true
-		mapLock.Lock()
-		globalJobsResults[job.id] = &job
-		mapLock.Unlock()
+		//mapLock.Lock()
+		//globalJobsResults[job.id] = job
+		//mapLock.Unlock()
 		return
 	}
 	// job process started.
@@ -352,9 +352,9 @@ func executeJob(job Job, ctx context.Context) {
 	}
 
 	// get write lock and add the final state of the job to results map.
-	mapLock.Lock()
-	globalJobsResults[job.id] = &job
-	mapLock.Unlock()
+	//mapLock.Lock()
+	//globalJobsResults[job.id] = &job
+	//mapLock.Unlock()
 	jobslog.Printf("saved the execution result of job with id [%s]\n", job.id)
 }
 
@@ -422,7 +422,7 @@ func handleJobsRequests(w http.ResponseWriter, r *http.Request) {
 
 	// build each job per command with resources limit values.
 	for i, cmd := range cmds {
-		job := Job{
+		job := &Job{
 			id:          generateID(),
 			pid:         0,
 			task:        cmd,
@@ -432,6 +432,7 @@ func handleJobsRequests(w http.ResponseWriter, r *http.Request) {
 			errormsg:    "",
 			fetchcount:  0,
 			stop:        make(chan struct{}, 1),
+			result:      new(bytes.Buffer),
 			memlimit:    memlimit,
 			cpulimit:    cpulimit,
 			submittime:  time.Now().UTC(),
@@ -440,7 +441,7 @@ func handleJobsRequests(w http.ResponseWriter, r *http.Request) {
 		}
 		// register job to global map results so user can check status while job being executed.
 		mapLock.Lock()
-		globalJobsResults[job.id] = &job
+		globalJobsResults[job.id] = job
 		mapLock.Unlock()
 		// add this job to the processing queue.
 		globalJobsQueue <- job
@@ -495,7 +496,7 @@ func stopJobsById(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		i += 1
-		if (*job).iscompleted == false {
+		if job.iscompleted == false {
 			// stream the added job details to user/client.
 			fmt.Fprintln(w, fmt.Sprintf("|%04d | %-18s | %-14s | %-16s |", i, job.id, "true", "true"))
 			// add value to stop channel to trigger job stop.
@@ -602,10 +603,11 @@ func restartJobsById(w http.ResponseWriter, r *http.Request) {
 
 		} else {
 			// job already completed (not running). reset and start it by adding to jobs queue.
+			jobslog.Printf("restarting - reseting before adding old job with id [%s] to the queue\n", job.id)
 			mapLock.Lock()
-			_ = resetCompletedJobInfos(job)
+			resetCompletedJobInfos(job)
 			mapLock.Unlock()
-			globalJobsQueue <- *job
+			globalJobsQueue <- job
 			jobslog.Printf("restarting - added old job with id [%s] to the queue\n", job.id)
 			fmt.Fprintln(w, fmt.Sprintf("|%04d | %-18s | %-14s | %-16s | %-12s |", i, job.id, "no", "n/a", "yes"))
 		}
@@ -629,11 +631,11 @@ func restartAllJobs(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintln(w, title)
 	fmt.Fprintf(w, fmt.Sprintf("+%s-+-%s-+-%s-+-%s-+-%s-+\n", Dashs(4), Dashs(18), Dashs(14), Dashs(16), Dashs(12)))
 
-	// lock the map and iterate over to check each job status (iscompleted)
-	// and fill the stop channel accordingly or add job to processing queue.
+	// lock the map and iterate over to check each job status (iscompleted) then fill
+	// the stop channel accordingly or reset before adding the job to processing queue.
 	i := 0
-	wg := &sync.WaitGroup{}
-	mapLock.RLock()
+	//wg := &sync.WaitGroup{}
+	mapLock.Lock()
 	for _, job := range globalJobsResults {
 		i += 1
 		if job.iscompleted == false {
@@ -643,40 +645,29 @@ func restartAllJobs(w http.ResponseWriter, r *http.Request) {
 			fmt.Fprintln(w, fmt.Sprintf("|%04d | %-18s | %-14s | %-16s | %-12s |", i, job.id, "yes", "yes", "n/a"))
 
 		} else {
-			// job already completed (not running). so reset and
-			// start it by adding to jobs queue in parallel.
-			wg.Add(1)
-			go func() {
-				mapLock.Lock()
-				_ = resetCompletedJobInfos(job)
-				mapLock.Unlock()
-				globalJobsQueue <- *job
-				jobslog.Printf("restarting - added old job with id [%s] to the queue\n", job.id)
-				wg.Done()
-			}()
-
+			// job already completed (not running). so reset and start it by adding to jobs queue in parallel.
+			jobslog.Printf("restarting - reseting before adding old job with id [%s] to the queue\n", job.id)
+			resetCompletedJobInfos(job)
+			globalJobsQueue <- job
+			jobslog.Printf("restarting - added old job with id [%s] to the queue\n", job.id)
 			fmt.Fprintln(w, fmt.Sprintf("|%04d | %-18s | %-14s | %-16s | %-12s |", i, job.id, "no", "n/a", "yes"))
 		}
 		fmt.Fprintf(w, fmt.Sprintf("+%s-+-%s-+-%s-+-%s-+-%s-+\n", Dashs(4), Dashs(18), Dashs(14), Dashs(16), Dashs(12)))
 	}
-	mapLock.RUnlock()
-	// wait until all goroutines done.
-	wg.Wait()
+	mapLock.Unlock()
 }
 
 // resetCompletedJobInfos resets a given job details (only if it has been completed/stopped before) for restarting.
-func resetCompletedJobInfos(j *Job) bool {
-	if j.iscompleted {
-		j.pid = 0
-		j.iscompleted, j.issuccess = false, false
-		j.exitcode = -1
-		j.errormsg = ""
-		j.stop = make(chan struct{}, 1)
-		j.starttime, j.endtime = time.Time{}, time.Time{}
-		return true
-	}
-
-	return false
+func resetCompletedJobInfos(j *Job) {
+	jobslog.Printf("restarting - start reseting job with id [%s] to the queue\n", j.id)
+	j.pid = 0
+	j.iscompleted, j.issuccess = false, false
+	j.exitcode = -1
+	j.errormsg = ""
+	// j.stop = make(chan struct{}, 1)
+	j.starttime, j.endtime = time.Time{}, time.Time{}
+	(j.result).Reset()
+	jobslog.Printf("restarting - finish reseting old job with id [%s] to the queue\n", j.id)
 }
 
 // checkJobsStatusById tells us if one or multiple submitted jobs are either in progress
