@@ -9,6 +9,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -1031,20 +1032,20 @@ func stopDeamon() error {
 func setupLoggers() {
 	// build log folder based on current launch day.
 	logfolder := fmt.Sprintf("%d%02d%02d.logs", time.Now().Year(), time.Now().Month(), time.Now().Day())
-	// use current day's log folder to store all logs files. if not exists, create it.
+	// use current day log folder to store all logs files. if the folder does not exist, create it.
 	info, err := os.Stat(logfolder)
-	if !os.IsExist(err) {
+	if errors.Is(err, os.ErrNotExist) {
 		// folder does not exist.
 		err := os.Mkdir(logfolder, 0755)
 		if err != nil {
-			fmt.Printf(" [-] Program aborted. failed to create %q logging folder - errmsg: %v", logfolder, err)
-			time.Sleep(waitingTime * time.Second)
+			// failed to create directory.
+			log.Printf("program aborted - failed to create %q logging folder - errmsg: %v", logfolder, err)
 			os.Exit(1)
 		}
 	} else {
-		// folder already exists abort if not a directory.
+		// folder or path already exists but abort if not a directory.
 		if !info.IsDir() {
-			log.Printf("%q already exists but it is not a folder so check before continue - errmsg : %v\n", logfolder, err)
+			log.Printf("%q already exists but it is not a folder so check before continue - errmsg: %v\n", logfolder, err)
 			os.Exit(0)
 		}
 	}
@@ -1052,8 +1053,7 @@ func setupLoggers() {
 	// create the log file for web server requests.
 	logfile, err := os.OpenFile(logfolder+string(os.PathSeparator)+"web.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
 	if err != nil {
-		fmt.Printf(" [*] Program aborted // failed to create requests log file - errmsg : %v\n", err)
-		time.Sleep(waitingTime * time.Second)
+		log.Printf("program aborted - failed to create requests log file - errmsg: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -1063,8 +1063,7 @@ func setupLoggers() {
 	// create file to log deleted jobs by cleanupMapResults goroutine.
 	deletedjobslogfile, err := os.OpenFile(logfolder+string(os.PathSeparator)+"deleted.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
 	if err != nil {
-		fmt.Printf(" [*] Program aborted // failed to create jobs deletion log file - errmsg : %v\n", err)
-		time.Sleep(waitingTime * time.Second)
+		log.Printf("program aborted - failed to create jobs deletion log file - errmsg: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -1074,14 +1073,13 @@ func setupLoggers() {
 	// create file to log jobs related activities.
 	jobslogfile, err := os.OpenFile(logfolder+string(os.PathSeparator)+"jobs.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
 	if err != nil {
-		fmt.Printf(" [*] Program aborted // failed to create jobs processing log file - errmsg : %v\n", err)
-		time.Sleep(waitingTime * time.Second)
+		log.Printf("program aborted - failed to create jobs processing log file - errmsg: %v\n", err)
 		os.Exit(1)
 	}
 
 	// setup logging format and parameters.
 	jobslog = log.New(jobslogfile, "[ INFOS ] ", log.LstdFlags|log.Lshortfile)
-	log.Println("log folder and all log files successfully setup ...")
+	log.Println("logs folder and all log files successfully created.")
 }
 
 // logRequestMiddleware is middleware that logs incoming request details.
