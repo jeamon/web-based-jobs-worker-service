@@ -182,7 +182,6 @@ func getPID() (pid int, err error) {
 
 // sendUsage returns docs about the APIs.
 func webHelp(w http.ResponseWriter, r *http.Request) {
-	weblog.Printf("received request - %s\n", r.URL.Path)
 	w.Header().Set("Content-Type", "text/plain; charset=utf8")
 	fmt.Fprintf(w, help)
 
@@ -240,7 +239,7 @@ func executeJob(job *Job, ctx context.Context) {
 		jobctx, _ = context.WithTimeout(ctx, time.Duration(job.timeout)*time.Minute)
 	}
 
-	jobslog.Printf("started the processing of job with id [%s]\n", job.id)
+	jobslog.Printf("[%s] [%05d] starting the processing of the job\n", job.id, job.pid)
 	var cmd *exec.Cmd
 
 	// command syntax for windows platform.
@@ -258,7 +257,7 @@ func executeJob(job *Job, ctx context.Context) {
 	if err := cmd.Start(); err != nil {
 		// no need to continue - add job stats to map.
 		job.endtime = time.Now().UTC()
-		jobslog.Printf("failed to start job with id [%s] - errmsg: %v\n", job.id, err)
+		jobslog.Printf("[%s] [%05d] failed to start the job - errmsg: %v\n", job.id, job.pid, err)
 		job.issuccess = false
 		job.errormsg = err.Error()
 		job.iscompleted = true
@@ -289,17 +288,17 @@ func executeJob(job *Job, ctx context.Context) {
 
 		case context.DeadlineExceeded:
 			// timeout reached - so try to kill the job process.
-			jobslog.Printf("timeout reached - failed to complete processing of job with id [%s]\n", job.id)
+			jobslog.Printf("[%s] [%05d] timeout reached. failed to complete the processing of the job\n", job.id, job.pid)
 		case context.Canceled:
 			// context cancellation triggered.
-			jobslog.Printf("job execution cancelled - failed to complete processing of job with id [%s]\n", job.id)
+			jobslog.Printf("[%s] [%05d] cancellation triggered. aborted the processing of the job\n", job.id, job.pid)
 		}
 
 		// kill the process and exit from this function.
 		if perr := cmd.Process.Kill(); perr != nil {
-			jobslog.Printf("failed to kill process id [%d] of job with id [%s] - errmsg: %v\n", cmd.Process.Pid, job.id, perr)
+			jobslog.Printf("[%s] [%05d] failed to kill the associated process of the job - errmsg: %v\n", job.id, job.pid, perr)
 		} else {
-			jobslog.Printf("succeeded to kill process id [%d] of job with id [%s]\n", cmd.Process.Pid, job.id)
+			jobslog.Printf("[%s] [%05d] succeeded to kill the associated process of the job\n", job.id, job.pid)
 		}
 		// leave the select loop.
 		break
@@ -307,11 +306,11 @@ func executeJob(job *Job, ctx context.Context) {
 	case <-job.stop:
 		stopped = true
 		// stop requested by user. kill the process and exit from this function.
-		jobslog.Printf("job stop requested - stopping of job with id [%s]\n", job.id)
+		jobslog.Printf("[%s] [%05d] stopping the processing of the job\n", job.id, job.pid)
 		if perr := cmd.Process.Kill(); perr != nil {
-			jobslog.Printf("failed to kill process id [%d] of job with id [%s] - errmsg: %v\n", cmd.Process.Pid, job.id, perr)
+			jobslog.Printf("[%s] [%05d] failed to kill the associated process of the job - errmsg: %v\n", job.id, job.pid, perr)
 		} else {
-			jobslog.Printf("succeeded to kill process id [%d] of job with id [%s]\n", cmd.Process.Pid, job.id)
+			jobslog.Printf("[%s] [%05d] succeeded to kill the associated process of the job\n", job.id, job.pid)
 		}
 		// leave the select loop.
 		break
@@ -326,7 +325,7 @@ func executeJob(job *Job, ctx context.Context) {
 
 	if err != nil {
 		// timeout not reached - but an error occured during execution
-		jobslog.Printf("error occured during execution - failed to complete job with id [%s] - errmsg: %v\n", job.id, err)
+		jobslog.Printf("[%s] [%05d] error occured during the processing of the job - errmsg: %v\n", job.id, job.pid, err)
 		job.issuccess = false
 		job.errormsg = err.Error()
 		// lets get the exit code.
@@ -338,7 +337,7 @@ func executeJob(job *Job, ctx context.Context) {
 
 	if err == nil && !stopped {
 		// exited from select loop due to other reason than job stop request.
-		jobslog.Printf("completed processing with success of job with id [%s]\n", job.id)
+		jobslog.Printf("[%s] [%05d] successfully completed the processing of the job\n", job.id, job.pid)
 		job.issuccess = true
 		// success, exitCode should be 0
 		ws := cmd.ProcessState.Sys().(syscall.WaitStatus)
@@ -347,16 +346,10 @@ func executeJob(job *Job, ctx context.Context) {
 
 	if err == nil && stopped {
 		// exited from select loop due to job stop request.
-		jobslog.Printf("terminated processing due to stop request of job with id [%s]\n", job.id)
+		jobslog.Printf("[%s] [%05d] successfully stopped the processing of the job\n", job.id, job.pid)
 		job.issuccess = true
 		// no exit code for killed process - lets leave it to -1 for reference.
 	}
-
-	// get write lock and add the final state of the job to results map.
-	//mapLock.Lock()
-	//globalJobsResults[job.id] = &job
-	//mapLock.Unlock()
-	jobslog.Printf("saved the execution result of job with id [%s]\n", job.id)
 }
 
 // jobsMonitor watches the global jobs queue and spin up a separate executor to handle the task.
@@ -446,7 +439,7 @@ func handleJobsRequests(w http.ResponseWriter, r *http.Request) {
 		mapLock.Unlock()
 		// add this job to the processing queue.
 		globalJobsQueue <- job
-		jobslog.Printf("added new job with id [%s] to the queue\n", job.id)
+		jobslog.Printf("[%s] [%05d] scheduled the new job onto the processing queue\n", job.id, job.pid)
 		// stream the added job details to user/client.
 		fmt.Fprintln(w, fmt.Sprintf("|%04d | %-18s | %-14d | %-10d | %-38v | %-20s |", i+1, job.id, job.memlimit, job.cpulimit, (job.submittime).Format("2006-01-02 15:04:05"), job.task))
 		fmt.Fprintln(w, fmt.Sprintf("+%s-+-%s-+-%s-+-%s-+-%s-+-%s-+", Dashs(4), Dashs(18), Dashs(14), Dashs(10), Dashs(38), Dashs(20)))
@@ -599,17 +592,16 @@ func restartJobsById(w http.ResponseWriter, r *http.Request) {
 		if job.iscompleted == false {
 			// job is still running. add value to stop channel to trigger job stop.
 			job.stop <- struct{}{}
-			jobslog.Printf("restarting - only stop triggered for old job with id [%s]\n", job.id)
+			jobslog.Printf("[%s] [%05d] restart requested for the running job. stop triggered for the job\n", job.id, job.pid)
 			fmt.Fprintln(w, fmt.Sprintf("|%04d | %-18s | %-14s | %-16s | %-12s |", i, job.id, "yes", "yes", "n/a"))
 
 		} else {
 			// job already completed (not running). reset and start it by adding to jobs queue.
-			jobslog.Printf("restarting - reseting before adding old job with id [%s] to the queue\n", job.id)
 			mapLock.Lock()
 			resetCompletedJobInfos(job)
 			mapLock.Unlock()
 			globalJobsQueue <- job
-			jobslog.Printf("restarting - added old job with id [%s] to the queue\n", job.id)
+			jobslog.Printf("[%s] [%05d] restart requested for the completed job. reset the details and scheduled the job\n", job.id, job.pid)
 			fmt.Fprintln(w, fmt.Sprintf("|%04d | %-18s | %-14s | %-16s | %-12s |", i, job.id, "no", "n/a", "yes"))
 		}
 
@@ -642,15 +634,14 @@ func restartAllJobs(w http.ResponseWriter, r *http.Request) {
 		if job.iscompleted == false {
 			// job is still running. add value to stop channel to trigger job stop.
 			job.stop <- struct{}{}
-			jobslog.Printf("restarting - only stop triggered for old job with id [%s]\n", job.id)
+			jobslog.Printf("[%s] [%05d] restart requested for the running job. stop triggered for the job\n", job.id, job.pid)
 			fmt.Fprintln(w, fmt.Sprintf("|%04d | %-18s | %-14s | %-16s | %-12s |", i, job.id, "yes", "yes", "n/a"))
 
 		} else {
 			// job already completed (not running). so reset and start it by adding to jobs queue in parallel.
-			jobslog.Printf("restarting - reseting before adding old job with id [%s] to the queue\n", job.id)
 			resetCompletedJobInfos(job)
 			globalJobsQueue <- job
-			jobslog.Printf("restarting - added old job with id [%s] to the queue\n", job.id)
+			jobslog.Printf("[%s] [%05d] restart requested for the completed job. reset the details and scheduled job onto processing queue\n", job.id, job.pid)
 			fmt.Fprintln(w, fmt.Sprintf("|%04d | %-18s | %-14s | %-16s | %-12s |", i, job.id, "no", "n/a", "yes"))
 		}
 		fmt.Fprintf(w, fmt.Sprintf("+%s-+-%s-+-%s-+-%s-+-%s-+\n", Dashs(4), Dashs(18), Dashs(14), Dashs(16), Dashs(12)))
@@ -660,15 +651,12 @@ func restartAllJobs(w http.ResponseWriter, r *http.Request) {
 
 // resetCompletedJobInfos resets a given job details (only if it has been completed/stopped before) for restarting.
 func resetCompletedJobInfos(j *Job) {
-	jobslog.Printf("restarting - start reseting job with id [%s] to the queue\n", j.id)
 	j.pid = 0
 	j.iscompleted, j.issuccess = false, false
 	j.exitcode = -1
 	j.errormsg = ""
-	// j.stop = make(chan struct{}, 1)
 	j.starttime, j.endtime = time.Time{}, time.Time{}
 	(j.result).Reset()
-	jobslog.Printf("restarting - finish reseting old job with id [%s] to the queue\n", j.id)
 }
 
 // checkJobsStatusById tells us if one or multiple submitted jobs are either in progress
@@ -821,7 +809,7 @@ func cleanupMapResults(interval int, maxcount int, deadtime int, exit <-chan str
 				if (*job).fetchcount > maxcount || (time.Since((*job).endtime) > (time.Duration(deadtime) * time.Minute)) {
 					// remove job which was terminated since deadtime hours or requested 10 times.
 					delete(globalJobsResults, id)
-					deletedjobslog.Printf("removed Job ID [%s] from the results queue\n", id)
+					deletedjobslog.Printf("[%s] [%05d] cleanup routine removed job from the results queue\n", id, job.id)
 				}
 			}
 			mapLock.Unlock()
@@ -1058,7 +1046,7 @@ func setupLoggers() {
 	}
 
 	// setup logging format and parameters.
-	weblog = log.New(logfile, "[ INFOS ] ", log.LstdFlags|log.Lshortfile)
+	weblog = log.New(logfile, "", log.LstdFlags|log.Lshortfile)
 
 	// create file to log deleted jobs by cleanupMapResults goroutine.
 	deletedjobslogfile, err := os.OpenFile(logfolder+string(os.PathSeparator)+"deleted.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
@@ -1068,7 +1056,7 @@ func setupLoggers() {
 	}
 
 	// setup logging format and parameters.
-	deletedjobslog = log.New(deletedjobslogfile, "[ INFOS ] ", log.LstdFlags|log.Lshortfile)
+	deletedjobslog = log.New(deletedjobslogfile, "", log.LstdFlags|log.Lshortfile)
 
 	// create file to log jobs related activities.
 	jobslogfile, err := os.OpenFile(logfolder+string(os.PathSeparator)+"jobs.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
@@ -1078,7 +1066,7 @@ func setupLoggers() {
 	}
 
 	// setup logging format and parameters.
-	jobslog = log.New(jobslogfile, "[ INFOS ] ", log.LstdFlags|log.Lshortfile)
+	jobslog = log.New(jobslogfile, "", log.LstdFlags|log.Lshortfile)
 	log.Println("logs folder and all log files successfully created.")
 }
 
