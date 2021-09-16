@@ -188,6 +188,24 @@ func webHelp(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
+// removeDuplicateJobIds rebuilds the slice of string by deleting duplicate elements.
+func removeDuplicateJobIds(ids *[]string) {
+
+	if len(*ids) == 2 && (*ids)[0] != (*ids)[1] {
+		return
+	}
+
+	temp := make(map[string]struct{})
+	for _, id := range *ids {
+		temp[id] = struct{}{}
+	}
+	*ids = nil
+	*ids = make([]string, 0)
+	for id, _ := range temp {
+		*ids = append(*ids, id)
+	}
+}
+
 // instantCommandExecutor is a function that execute a single passed command and send the result.
 // examples: curl localhost:8080/execute?cmd=dir+/B
 // curl localhost:8080/execute?cmd=mkdir+jerome
@@ -461,6 +479,12 @@ func stopJobsById(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("\n[+] Hello • The request sent is malformed • The expected format is :\n http://server-ip:8080/jobs/stop?id=xx&id=xx\n"))
 		return
 	}
+
+	// cleanup user submitted list of jobs ids.
+	if len(ids) >= 2 {
+		removeDuplicateJobIds(&ids)
+	}
+
 	w.WriteHeader(200)
 	w.Write([]byte("\n[+] stopped jobs [non-existent will be ignored] - zoom in to fit the screen\n\n"))
 
@@ -561,6 +585,12 @@ func restartJobsById(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("\n[+] Hello • The request sent is malformed • The expected format is :\n https://server-ip:8080/jobs/restart?id=xx&id=xx\n"))
 		return
 	}
+
+	// cleanup user submitted list of jobs ids.
+	if len(ids) >= 2 {
+		removeDuplicateJobIds(&ids)
+	}
+
 	w.WriteHeader(200)
 	w.Write([]byte("\n[+] restart summary - retry or check status for not restarted jobs. zoom in to fit the screen\n\n"))
 
@@ -674,6 +704,12 @@ func checkJobsStatusById(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("\n[+] Hello • The request sent is malformed • The expected format is :\n http://server-ip:8080/jobs/status?id=xx&id=xx\n"))
 		return
 	}
+
+	// cleanup user submitted list of jobs ids.
+	if len(ids) >= 2 {
+		removeDuplicateJobIds(&ids)
+	}
+
 	w.WriteHeader(200)
 	w.Write([]byte("\n[+] status of the jobs [non-existent will be ignored] - zoom in to fit the screen\n\n"))
 
