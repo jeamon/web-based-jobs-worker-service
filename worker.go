@@ -188,15 +188,21 @@ func webHelp(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
-// removeDuplicateJobIds rebuilds the slice of string by deleting duplicate elements.
-func removeDuplicateJobIds(ids *[]string) {
+// removeDuplicateJobIds rebuilds the slice of job ids (string type) by verifying the format and deleting
+// duplicate elements. In case there is no remaining valid id it returns true to ignore the request.
+func removeDuplicateJobIds(ids *[]string) bool {
 
-	if len(*ids) == 2 && (*ids)[0] != (*ids)[1] {
-		return
+	if len(*ids) == 1 {
+		if match, _ := regexp.MatchString(`[a-z0-9]{16}`, (*ids)[0]); !match {
+			return true
+		}
 	}
 
 	temp := make(map[string]struct{})
 	for _, id := range *ids {
+		if match, _ := regexp.MatchString(`[a-z0-9]{16}`, id); !match {
+			continue
+		}
 		temp[id] = struct{}{}
 	}
 	*ids = nil
@@ -204,6 +210,12 @@ func removeDuplicateJobIds(ids *[]string) {
 	for id, _ := range temp {
 		*ids = append(*ids, id)
 	}
+
+	if len(*ids) == 0 {
+		return true
+	}
+
+	return false
 }
 
 // instantCommandExecutor is a function that execute a single passed command and send the result.
@@ -481,12 +493,15 @@ func stopJobsById(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// cleanup user submitted list of jobs ids.
-	if len(ids) >= 2 {
-		removeDuplicateJobIds(&ids)
+	if ignore := removeDuplicateJobIds(&ids); ignore {
+		// no remaining good job id.
+		w.WriteHeader(400)
+		w.Write([]byte("\n[+] Hello • The request sent does not contain any valid job id remaining after verification.\n"))
+		return
 	}
 
 	w.WriteHeader(200)
-	w.Write([]byte("\n[+] stopped jobs [non-existent will be ignored] - zoom in to fit the screen\n\n"))
+	w.Write([]byte("\n[+] stopped jobs [non-existent or invalid ids will be ignored] - zoom in to fit the screen\n\n"))
 
 	// format the display table.
 	title := fmt.Sprintf("|%-4s | %-18s | %-14s | %-16s |", "Nb", "Job ID", "Was Running", "Stop Triggered")
@@ -499,12 +514,6 @@ func stopJobsById(w http.ResponseWriter, r *http.Request) {
 	var errorsMessages string
 	mapLock.RLock()
 	for _, id := range ids {
-
-		if match, _ := regexp.MatchString(`[a-z0-9]{16}`, id); !match {
-			// wrong job id format.
-			errorsMessages = errorsMessages + fmt.Sprintf("\n[-] Job ID [%s] is invalid - please make sure to provide the right ID", id)
-			continue
-		}
 
 		job, exist := globalJobsResults[id]
 
@@ -587,8 +596,11 @@ func restartJobsById(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// cleanup user submitted list of jobs ids.
-	if len(ids) >= 2 {
-		removeDuplicateJobIds(&ids)
+	if ignore := removeDuplicateJobIds(&ids); ignore {
+		// no remaining good job id.
+		w.WriteHeader(400)
+		w.Write([]byte("\n[+] Hello • The request sent does not contain any valid job id remaining after verification.\n"))
+		return
 	}
 
 	w.WriteHeader(200)
@@ -604,11 +616,6 @@ func restartJobsById(w http.ResponseWriter, r *http.Request) {
 	var errorsMessages string
 	for _, id := range ids {
 
-		if match, _ := regexp.MatchString(`[a-z0-9]{16}`, id); !match {
-			// wrong job id format.
-			errorsMessages = errorsMessages + fmt.Sprintf("\n[-] Job ID [%s] is invalid - please make sure to provide the right ID", id)
-			continue
-		}
 		mapLock.RLock()
 		job, exist := globalJobsResults[id]
 		mapLock.RUnlock()
@@ -706,12 +713,15 @@ func checkJobsStatusById(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// cleanup user submitted list of jobs ids.
-	if len(ids) >= 2 {
-		removeDuplicateJobIds(&ids)
+	if ignore := removeDuplicateJobIds(&ids); ignore {
+		// no remaining good job id.
+		w.WriteHeader(400)
+		w.Write([]byte("\n[+] Hello • The request sent does not contain any valid job id remaining after verification.\n"))
+		return
 	}
 
 	w.WriteHeader(200)
-	w.Write([]byte("\n[+] status of the jobs [non-existent will be ignored] - zoom in to fit the screen\n\n"))
+	w.Write([]byte("\n[+] status of the jobs [non-existent or invalid ids will be ignored] - zoom in to fit the screen\n\n"))
 
 	// format the display table.
 	title := fmt.Sprintf("|%-4s | %-18s | %-6s | %-10s | %-12s | %-10s | %-14s | %-10s | %-38s | %-38s | %-38s | %-20s |", "Nb", "Job ID", "Done", "Success", "Exit Code", "Count", "Memory [MB]", "CPU [%]", "Submitted At [UTC]", "Started At [UTC]", "Ended At [UTC]", "Command Syntax")
@@ -721,19 +731,16 @@ func checkJobsStatusById(w http.ResponseWriter, r *http.Request) {
 
 	// retreive each job status and send.
 	i := 0
+	var errorsMessages string
 	var start, end string
 	mapLock.RLock()
 	for _, id := range ids {
 
-		if match, _ := regexp.MatchString(`[a-z0-9]{16}`, id); !match {
-			fmt.Fprintln(w, fmt.Sprintf("\n[-] Job ID [%s] is invalid - please make sure to provide the right ID", id))
-			continue
-		}
-
 		job, exist := globalJobsResults[id]
 
 		if !exist {
-			weblog.Printf("status for job with id [%s] does not exist\n", id)
+			// job id does not exist.
+			errorsMessages = errorsMessages + fmt.Sprintf("\n[-] Job ID [%s] does not exist - maybe wrong id or removed from store\n", id)
 			continue
 		}
 		i += 1
@@ -755,6 +762,8 @@ func checkJobsStatusById(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, fmt.Sprintf("+%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+\n", Dashs(4), Dashs(18), Dashs(6), Dashs(10), Dashs(12), Dashs(10), Dashs(14), Dashs(10), Dashs(38), Dashs(38), Dashs(38), Dashs(20)))
 	}
 	mapLock.RUnlock()
+	// send all errors collected.
+	fmt.Fprintln(w, errorsMessages)
 }
 
 // getAllJobsStatus display all submitted jobs details
