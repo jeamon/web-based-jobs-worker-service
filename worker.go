@@ -882,9 +882,7 @@ func handleSignal(exit chan struct{}, wg *sync.WaitGroup) {
 	os.Remove(pidFile)
 	// close quit - so jobs monitor groutine will be notified.
 	close(exit)
-
 	return
-	// os.Exit(0)
 }
 
 // getStatus will read stored PID from the local file and will send a
@@ -1073,12 +1071,16 @@ func setupLoggers() {
 		if err != nil {
 			// failed to create directory.
 			log.Printf("program aborted - failed to create %q logging folder - errmsg: %v", logfolder, err)
+			// try to remove PID file.
+			os.Remove(pidFile)
 			os.Exit(1)
 		}
 	} else {
 		// folder or path already exists but abort if not a directory.
 		if !info.IsDir() {
 			log.Printf("%q already exists but it is not a folder so check before continue - errmsg: %v\n", logfolder, err)
+			// try to remove PID file.
+			os.Remove(pidFile)
 			os.Exit(0)
 		}
 	}
@@ -1087,6 +1089,8 @@ func setupLoggers() {
 	logfile, err := os.OpenFile(logfolder+string(os.PathSeparator)+"web.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
 	if err != nil {
 		log.Printf("program aborted - failed to create requests log file - errmsg: %v\n", err)
+		// try to remove PID file.
+		os.Remove(pidFile)
 		os.Exit(1)
 	}
 
@@ -1097,6 +1101,8 @@ func setupLoggers() {
 	deletedjobslogfile, err := os.OpenFile(logfolder+string(os.PathSeparator)+"deleted.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
 	if err != nil {
 		log.Printf("program aborted - failed to create jobs deletion log file - errmsg: %v\n", err)
+		// try to remove PID file.
+		os.Remove(pidFile)
 		os.Exit(1)
 	}
 
@@ -1107,6 +1113,8 @@ func setupLoggers() {
 	jobslogfile, err := os.OpenFile(logfolder+string(os.PathSeparator)+"jobs.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
 	if err != nil {
 		log.Printf("program aborted - failed to create jobs processing log file - errmsg: %v\n", err)
+		// try to remove PID file.
+		os.Remove(pidFile)
 		os.Exit(1)
 	}
 
@@ -1132,12 +1140,16 @@ func createCertsFolder() {
 		err := os.Mkdir("certs", 0755)
 		if err != nil {
 			log.Printf("failed create %q folder - errmsg : %v\n", "certs", err)
+			// try to remove PID file.
+			os.Remove(pidFile)
 			os.Exit(1)
 		}
 	} else {
 		// path already exists but could be file or directory.
 		if !info.IsDir() {
 			log.Printf("path %q exists but it is not a folder so please check before continue - errmsg : %v\n", "certs", err)
+			// try to remove PID file.
+			os.Remove(pidFile)
 			os.Exit(0)
 		}
 	}
@@ -1187,6 +1199,8 @@ func generateServerCertificate() ([]byte, []byte) {
 	serverPrivKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		log.Printf("failed to generate server private key - errmsg : %v\n", err)
+		// try to remove PID file.
+		os.Remove(pidFile)
 		os.Exit(1)
 	}
 
@@ -1201,12 +1215,16 @@ func generateServerCertificate() ([]byte, []byte) {
 
 	if err != nil {
 		log.Printf("failed to pem encode server private key - errmsg : %v\n", err)
+		// try to remove PID file.
+		os.Remove(pidFile)
 		os.Exit(2)
 	}
 
 	// dump CA private key into a file.
 	if err := os.WriteFile(serverPrivKeyPath, serverPrivKeyPEM.Bytes(), 0644); err != nil {
 		log.Printf("failed to save on disk the server private key - errmsg : %v\n", err)
+		// try to remove PID file.
+		os.Remove(pidFile)
 		os.Exit(1)
 	}
 
@@ -1216,6 +1234,8 @@ func generateServerCertificate() ([]byte, []byte) {
 	serverCertsBytes, err := x509.CreateCertificate(rand.Reader, serverCerts, serverCerts, &serverPrivKey.PublicKey, serverPrivKey)
 	if err != nil {
 		log.Printf("failed to create server certificate - errmsg : %v\n", err)
+		// try to remove PID file.
+		os.Remove(pidFile)
 		os.Exit(1)
 	}
 
@@ -1230,12 +1250,16 @@ func generateServerCertificate() ([]byte, []byte) {
 
 	if err != nil {
 		log.Printf("failed to pem encode server certificate - errmsg : %v\n", err)
+		// try to remove PID file.
+		os.Remove(pidFile)
 		os.Exit(2)
 	}
 
 	// dump certificate into a file.
 	if err := os.WriteFile(serverCertsPath, serverCertsPEM.Bytes(), 0644); err != nil {
 		log.Printf("failed to save on disk the server certificate - errmsg : %v\n", err)
+		// try to remove PID file.
+		os.Remove(pidFile)
 		os.Exit(1)
 	}
 
@@ -1255,6 +1279,8 @@ func startWebServer(exit <-chan struct{}) error {
 		serverTLSCerts, err = tls.X509KeyPair(generateServerCertificate())
 		if err != nil {
 			log.Printf("failed to load server's pem-encoded certificate and key - errmsg : %v\n", err)
+			// try to remove PID file.
+			os.Remove(pidFile)
 			os.Exit(1)
 		}
 	}
