@@ -1,7 +1,7 @@
-# jobs-worker-service
+# web-based-jobs-worker-service
 
-Cross-platform web & systems backend to execute multiple remote jobs from shell with possibility to specify execution timeout
-and fetch the result output and check one or more jobs status and stop one or more running jobs - all done from web interface. 
+A go-based fast backend service to spin up and control (stop or fetch or restart or delete) multiple remote jobs (applications or shell commands)
+with the capabilities to specify the execution timeout and resources limitations for these jobs. You perform everything just from your web browser. 
 
 * Click to watch the live [demo video](https://youtu.be/_xnINhN8MRI)
 
@@ -19,31 +19,37 @@ and fetch the result output and check one or more jobs status and stop one or mo
 
 ## Description
 
-This cross-platform web & systems backend allows to execute multiple commands from shell with possibility
-to specify single execution timeout for all of the commands submitted. The commands should be submmitted
-from web requests. Each command output will be made available into the system memory for further retrieval.
-Each command submitted is considered as a unique job with unique identifier. This backend service could be
-started - stopped and restarted almost like a unix deamon. Each submitted job could be stopped based on its
-unique id. Same approach to check the status. You can even view all submitted jobs status or stop them all.
-It is also possible to restart immediately one or multiple or all completed jobs. For not yet completed jobs
-restart call will trigger these jobs to stop before. Then you will need to call restart again on them.
-Finally, you can submit a single command and wait until it completes to view its result output immediately.
-Each start of the worker creates a folder to host all three logs files (web requests - jobs - jobs deletion).
-There is a single log where the worker will persist its standard output and standard error - worker dot log.
+You must launch the worker service by specifying an option. The available options are start - stop - restart. Once the worker started, it saves its process id (pid)
+into a local file named deamon(.)pid since this pid value will be used later to kill the process when you request to stop the worker service. The worker service will
+spin up some background procedures (goroutines) such as a monitoring service (cleanupMapResults - to cleanup after a certain time some completed jobs), a signal handler
+service (handleSignal - to process any system call exit signals) and a monitoring jobs queue service (jobsMonitor - to watch the jobs queue/channel and start processing).
+
+After creating the dedicated logs folder and files it loads its self-signed certificate and rsa-based private key. In case these files are not present into the certs
+folder, they will be created automatically with builtin parameters. This certificate is used by the web service to setup its TLS configurations.
+
+Once the web server is up & running, you can submit one or multiple jobs for remote execution. For each job, a unique id (16 hexadecimal characters) will be generated to
+identify this job, so it can be used to check the stop status or stop or restart or fetch the output restult of that job. Each job output is made available into memory
+for fast access.
+
+All jobs could be stopped or restarted as well. When a job restart is requested, in case this job is still running, it will only be stopped and you will need to restart it
+again in order to have it scheduled for processing. If already completed it will be immediately scheduled for processing.
+
+Finally, you can submit a single job and wait until it completes to view its result output immediately. Each start of the worker service creates three logs files. One file logs
+all web requests, another for each job processing details and the third one for recording each job details deleted by the cleanup background routine. The worker itself logs its
+standard output and standard error into a single file named worker(.)log. You can view all the features APIs exposed by the web server under the [usage section](#usage).
 
 
 ## Features
 
-Below is a summary of current available features. This section will be updated as project continue:
+Below is a summary of available features. This section will be updated as project continue:
 
 * command-line options to start or stop or restart the worker
 * command-line option to check the status of the worker service
 * submit one or several jobs from browser or any web client 
 * check the status of one or several jobs based on their ids
-* request the stop one or several jobs based on their ids
+* request the stop of one or several jobs based on their ids
 * fetch the execution result of a singlejob based on its id
-* request the status of all submitted jobs
-* request the stop of all running jobs
+* request the status or the stop of all submitted jobs
 * unique output log folder for each worker startup
 * single fixed worker log for standard output & error
 * per startup web server log and jobs log and deletion cron log 
@@ -68,6 +74,7 @@ On Windows, Linux macOS, and FreeBSD you will be able to download the pre-built 
 If your system has [Go >= 1.13+](https://golang.org/dl/) you can pull the codebase and build from the source.
 
 ```
+
 # build the worker program on windows
 git clone https://github.com/jeamon/wweb-based-jobs-worker-service.git && cd web-based-jobs-worker-service
 go build -o worker.exe worker.go help.go
@@ -75,40 +82,19 @@ go build -o worker.exe worker.go help.go
 # build the worker program on linux and others
 git clone https://github.com/jeamon/web-based-jobs-worker-service.git && cd web-based-jobs-worker-service
 go build -o worker worker.go help.go
+
+# build with docker for linux-based systems
+git clone https://github.com/jeamon/web-based-jobs-worker-service.git && cd web-based-jobs-worker-service
+docker build --tag unix-worker .
+docker run -d --publish 8080:8080 --name unix-worker --rm unix-worker /bin/sh -c "/app/worker start && sleep infinity"
+
 ```
 
 
 ## Usage
 
 
-```Usage:
-    
-
-
-	                    $$\                                                         $$\                           
-	                    $$ |                                                        $$ |                          
-	      $$\  $$$$$$\  $$$$$$$\   $$$$$$$\       $$\  $$\  $$\  $$$$$$\   $$$$$$\  $$ |  $$\  $$$$$$\   $$$$$$\  
-	      \__|$$  __$$\ $$  __$$\ $$  _____|      $$ | $$ | $$ |$$  __$$\ $$  __$$\ $$ | $$  |$$  __$$\ $$  __$$\ 
-	      $$\ $$ /  $$ |$$ |  $$ |\$$$$$$\        $$ | $$ | $$ |$$ /  $$ |$$ |  \__|$$$$$$  / $$$$$$$$ |$$ |  \__|
-	      $$ |$$ |  $$ |$$ |  $$ | \____$$\       $$ | $$ | $$ |$$ |  $$ |$$ |      $$  _$$<  $$   ____|$$ |      
-	      $$ |\$$$$$$  |$$$$$$$  |$$$$$$$  |      \$$$$$\$$$$  |\$$$$$$  |$$ |      $$ | \$$\ \$$$$$$$\ $$ |      
-	      $$ | \______/ \_______/ \_______/        \_____\____/  \______/ \__|      \__|  \__| \_______|\__|      
-	$$\   $$ |                                                                                                    
-	\$$$$$$  |                                                                                                    
-	 \______/
-
-
-	----------------------------------------------------------------------------------------------
-	
-			[current version 1.0 By Jerome AMON - cloudmentor.scale@gmail.com]
-
-	----------------------------------------------------------------------------------------------
-
-	[+] Hello - Please find below how to use use this web service.
-
-	----------------------------------------------------------------------------------------------
-
-	[*] Find below command line options dedicated to the worker service :
+* Find below command line options dedicated to the worker service :
 
 	[+] On Windows Operating System.
 	worker.exe [ start | stop | restart | status | help | version]
@@ -116,9 +102,8 @@ go build -o worker worker.go help.go
 	[+] On Linux Operating System.
 	./worker [ start | stop | restart | status | help | version]
 
-	----------------------------------------------------------------------------------------------
 	
-	[1] To execute a remote command and get instantly the output (replace space with + sign):
+* To execute a remote command and get instantly the output (replace space with + sign):
 	
 	https://<server-ip-address>:<port>/execute?cmd=<command+argument>
 	
@@ -132,9 +117,8 @@ go build -o worker worker.go help.go
 	example: https://127.0.0.1:8080/execute?cmd=ip+a
 	example: https://127.0.0.1:8080/execute?cmd=ps
 
-	----------------------------------------------------------------------------------------------
 
-	[2] To submit one or more commands (jobs) for immediate execution and later retreive outputs:
+* To submit one or more commands (jobs) for immediate execution and later retreive outputs:
 	
 	https://<server-ip-address>:<port>/jobs?cmd=<command+argument>&cmd=<command+argument>
 
@@ -145,85 +129,78 @@ go build -o worker worker.go help.go
 	[+] On Linux Operating System.
 	example: https://127.0.0.1:8080/jobs?cmd=ls+-la&cmd=ip+a&cmd=ps
 
-	----------------------------------------------------------------------------------------------
 
-	[3] To check the detailed status of one or more submitted commands (jobs):
+* To check the detailed status of one or more submitted commands (jobs):
 	
 	https://<server-ip-address>:<port>/jobs/status?id=<job-1-id>&id=<job-2-id>
 
 	[+] On Windows or Linux Operating System.
 	example: https://127.0.0.1:8080/jobs/status?id=abe478954cef4125&id=cde478910cef4125
 
-	----------------------------------------------------------------------------------------------
 
-	[4] To fetch the output of one command (job) submitted:
+* To fetch the output of one command (job) submitted:
 	
 	https://<server-ip-address>:<port>/jobs/results?id=<job-id>
 
 	[+] On Windows or Linux Operating System.
 	example: https://127.0.0.1:8080/jobs/results?id=abe478954cef4125
 
-	----------------------------------------------------------------------------------------------
 
-	[5] To check the status of all submitted commands (jobs):
+* To check the status of all submitted commands (jobs):
 	
-	https://<server-ip-address>:<port>/jobs/status/
-	https://<server-ip-address>:<port>/jobs/stats/
+	https://<server-ip-address>:<port>/jobs/status/?order=[asc|desc]
+	https://<server-ip-address>:<port>/jobs/stats/?order=[asc|desc]
 
 	[+] On Windows or Linux Operating System.
 	example: https://127.0.0.1:8080/jobs/status/
-	example: https://127.0.0.1:8080/jobs/stats/
+	example: https://127.0.0.1:8080/jobs/status/?order=asc
+	example: https://127.0.0.1:8080/jobs/stats/?order=desc
 
-	----------------------------------------------------------------------------------------------
 
-	[6] To stop of one or more submitted running commands (jobs):
+* To stop of one or more submitted running commands (jobs):
 	
 	https://<server-ip-address>:<port>/jobs/stop?id=<job-1-id>&id=<job-2-id>
 
 	[+] On Windows or Linux Operating System.
 	example: https://127.0.0.1:8080/jobs/stop?id=abe478954cef4125&id=cde478910cef4125
 
-	----------------------------------------------------------------------------------------------
 	
-	[7] To stop of all submitted running commands (jobs):
+* To stop of all submitted running commands (jobs):
 	
 	https://<server-ip-address>:<port>/jobs/stop/
 
 	[+] On Windows or Linux Operating System.
 	example: https://127.0.0.1:8080/jobs/stop/
 
-	----------------------------------------------------------------------------------------------
 	
-	[8] To restart one or more submitted commands (jobs):
+* To restart one or more submitted commands (jobs):
 	
 	https://<server-ip-address>:<port>/jobs/restart?id=<job-1-id>&id=<job-2-id>
 
 	[+] On Windows or Linux Operating System.
 	example: https://127.0.0.1:8080/jobs/restart?id=abe478954cef4125&id=cde478910cef4125
 
-	----------------------------------------------------------------------------------------------
 
-	[9] To restart all submitted commands (jobs):
+* To restart all submitted commands (jobs):
 	
 	https://<server-ip-address>:<port>/jobs/restart/
 
 	[+] On Windows or Linux Operating System.
 	example: https://127.0.0.1:8080/jobs/restart/
 
-	----------------------------------------------------------------------------------------------
 	
 ```
 
 
 ## Upcomings
 
-* add filter option to display details of completed or stopped or running jobs
-* add filter & order options into /jobs/status/ URI to sort by submit or start or end time
+* add filter option to display details of only completed or stopped or running jobs
 * add capability to load configuration details from file at startup
 * add option to store jobs result to redis server rather than in-memory map
 * add URI and handler to download execution output of one or multiple jobs by ids 
-* add command line options on worker service to list or delete jobs or dump output
+* add command line options on worker service to list or delete jobs or dump jobs output
 * add feature to move worker service into maintenance mode - stop accepting jobs
+* add log/output streaming capability for a given job with the use of websocket
 
 
 ## Contribution
