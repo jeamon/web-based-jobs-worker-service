@@ -23,6 +23,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -777,24 +778,68 @@ func checkJobsStatusById(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintln(w, errorsMessages)
 }
 
-// getAllJobsStatus display all submitted jobs details
-// triggered for following request : /jobs/status/
+// getAllJobsStatus display all jobs details by sorting (either in ascending or descending) them based on submitted time
+// then started time and then ended time. It is triggered for the following request : /jobs/status/?order=asc|desc
 func getAllJobsStatus(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf8")
 	w.WriteHeader(200)
-	w.Write([]byte("\n[+] status of all current jobs [job done with exitcode -1 means stopped] - zoom in to fit the screen\n\n"))
+	mapLock.RLock()
+	if len(globalJobsResults) == 0 {
+		w.Write([]byte("\n[+] There is currently no jobs submitted or available into the results queue to display.\n"))
+		return
+	}
+	mapLock.RUnlock()
 
+	w.Write([]byte("\n[+] status of all current jobs [job done with exitcode -1 means stopped] - zoom in to fit the screen\n\n"))
 	// format the display table.
 	title := fmt.Sprintf("|%-4s | %-18s | %-5s | %-6s | %-10s | %-12s | %-10s | %-14s | %-10s | %-20s | %-20s | %-20s | %-30s |", "Nb", "Job ID", "PID", "Done", "Success", "Exit Code", "Count", "Memory [MB]", "CPU [%]", "Submitted At [UTC]", "Started At [UTC]", "Ended At [UTC]", "Command Syntax")
 	fmt.Fprintln(w, strings.Repeat("=", len(title)))
 	fmt.Fprintln(w, title)
 	fmt.Fprintf(w, fmt.Sprintf("+%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+\n", Dashs(4), Dashs(18), Dashs(5), Dashs(6), Dashs(10), Dashs(12), Dashs(10), Dashs(14), Dashs(10), Dashs(20), Dashs(20), Dashs(20), Dashs(30)))
 
-	// retreive each job status and send.
-	i := 0
-	var start, end string
+	// constructs slice of all jobs from the results map.
+	var jobs []*Job
 	mapLock.RLock()
 	for _, job := range globalJobsResults {
+		jobs = append(jobs, job)
+	}
+	mapLock.RUnlock()
+
+	// retrieve odering parameter and sort the slice of jobs based on that.
+	order := r.URL.Query().Get("order")
+	if order == "desc" {
+		// sorting by descending order.
+		sort.Slice(jobs, func(i, j int) bool {
+			jobi, jobj := jobs[i], jobs[j]
+			switch {
+			case !jobi.submittime.Equal(jobj.submittime):
+				return jobi.submittime.After(jobj.submittime)
+			case !jobi.starttime.Equal(jobj.starttime):
+				return jobi.starttime.After(jobj.starttime)
+			default:
+				return jobi.endtime.After(jobj.endtime)
+			}
+		})
+
+	} else {
+		// default by sorting in ascending order.
+		sort.Slice(jobs, func(i, j int) bool {
+			jobi, jobj := jobs[i], jobs[j]
+			switch {
+			case !jobi.submittime.Equal(jobj.submittime):
+				return jobi.submittime.Before(jobj.submittime)
+			case !jobi.starttime.Equal(jobj.starttime):
+				return jobi.starttime.Before(jobj.starttime)
+			default:
+				return jobi.endtime.Before(jobj.endtime)
+			}
+		})
+	}
+
+	// loop over slice of jobs and send each job's status.
+	i := 0
+	var start, end string
+	for _, job := range jobs {
 		i += 1
 		// format time display for zero time values.
 		if (job.starttime).IsZero() {
@@ -812,7 +857,6 @@ func getAllJobsStatus(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, fmt.Sprintf("|%04d | %-18s | %05d | %-6v | %-10v | %-12d | %-10d | %-14d | %-10d | %-20v | %-20v | %-20v | %-30s |", i, job.id, job.pid, job.iscompleted, job.issuccess, job.exitcode, job.fetchcount, job.memlimit, job.cpulimit, (job.submittime).Format("2006-01-02 15:04:05"), start, end, truncateSyntax(job.task, 30)))
 		fmt.Fprintf(w, fmt.Sprintf("+%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+\n", Dashs(4), Dashs(18), Dashs(5), Dashs(6), Dashs(10), Dashs(12), Dashs(10), Dashs(14), Dashs(10), Dashs(20), Dashs(20), Dashs(20), Dashs(30)))
 	}
-	mapLock.RUnlock()
 }
 
 // getJobsResultsById retreive result output for a given (*job).
@@ -1332,7 +1376,7 @@ func startWebServer(exit <-chan struct{}) error {
 	router.HandleFunc("/jobs/status", checkJobsStatusById)
 	// expected query string : /jobs/results?id=xxxxx
 	router.HandleFunc("/jobs/results", getJobsResultsById)
-	// expected URI : /jobs/status/ or /jobs/stats/
+	// expected URI : /jobs/status/?order=asc|desc or /jobs/stats/?order=asc|desc
 	router.HandleFunc("/jobs/status/", getAllJobsStatus)
 	router.HandleFunc("/jobs/stats/", getAllJobsStatus)
 	// expected query string : /jobs/stop?id=xxx&id=xxx
