@@ -188,8 +188,6 @@ docker run -d --publish 8080:8080 --name unix-worker --rm unix-worker /bin/sh -c
 	[+] On Windows or Linux Operating System.
 	example: https://127.0.0.1:8080/jobs/restart/
 
-	
-```
 
 
 ## Upcomings
