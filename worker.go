@@ -438,13 +438,13 @@ func handleJobsRequests(w http.ResponseWriter, r *http.Request) {
 		cpulimit = c
 	}
 	w.WriteHeader(200)
-	w.Write([]byte("\n[+] Hello • Please find below the details of your jobs request :\n\n"))
+	w.Write([]byte("\n[+] find below some details of the jobs submitted\n\n"))
 
 	// format the display table.
-	title := fmt.Sprintf("|%-4s | %-18s | %-14s | %-10s | %-38s | %-20s |", "Nb", "Job ID", "Memory [MB]", "CPU [%]", "Submitted At [UTC]", "Command Syntax")
+	title := fmt.Sprintf("|%-4s | %-18s | %-14s | %-10s | %-38s | %-30s |", "Nb", "Job ID", "Memory [MB]", "CPU [%]", "Submitted At [UTC]", "Command Syntax")
 	fmt.Fprintln(w, strings.Repeat("=", len(title)))
 	fmt.Fprintln(w, title)
-	fmt.Fprintf(w, fmt.Sprintf("+%s-+-%s-+-%s-+-%s-+-%s-+-%s-+\n", Dashs(4), Dashs(18), Dashs(14), Dashs(10), Dashs(38), Dashs(20)))
+	fmt.Fprintf(w, fmt.Sprintf("+%s-+-%s-+-%s-+-%s-+-%s-+-%s-+\n", Dashs(4), Dashs(18), Dashs(14), Dashs(10), Dashs(38), Dashs(30)))
 
 	// build each job per command with resources limit values.
 	for i, cmd := range cmds {
@@ -473,8 +473,8 @@ func handleJobsRequests(w http.ResponseWriter, r *http.Request) {
 		globalJobsQueue <- job
 		jobslog.Printf("[%s] [%05d] scheduled the new job onto the processing queue\n", job.id, job.pid)
 		// stream the added job details to user/client.
-		fmt.Fprintln(w, fmt.Sprintf("|%04d | %-18s | %-14d | %-10d | %-38v | %-20s |", i+1, job.id, job.memlimit, job.cpulimit, (job.submittime).Format("2006-01-02 15:04:05"), job.task))
-		fmt.Fprintln(w, fmt.Sprintf("+%s-+-%s-+-%s-+-%s-+-%s-+-%s-+", Dashs(4), Dashs(18), Dashs(14), Dashs(10), Dashs(38), Dashs(20)))
+		fmt.Fprintln(w, fmt.Sprintf("|%04d | %-18s | %-14d | %-10d | %-38v | %-30s |", i+1, job.id, job.memlimit, job.cpulimit, (job.submittime).Format("2006-01-02 15:04:05"), truncateSyntax(job.task, 30)))
+		fmt.Fprintln(w, fmt.Sprintf("+%s-+-%s-+-%s-+-%s-+-%s-+-%s-+", Dashs(4), Dashs(18), Dashs(14), Dashs(10), Dashs(38), Dashs(30)))
 	}
 }
 
