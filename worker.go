@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"crypto/rand"
@@ -220,40 +221,103 @@ func removeDuplicateJobIds(ids *[]string) bool {
 	return false
 }
 
-// instantCommandExecutor is a function that execute a single passed command and send the result.
-// examples: curl localhost:8080/execute?cmd=dir+/B
-// curl localhost:8080/execute?cmd=mkdir+jerome
-// curl localhost:8080/execute?cmd=rmdir+jerome
-// replacing string. use + after ? AND use %20 before ?
+// instantCommandExecutor processes a single passed command/task and start streaming the result output immediately.
+// In case a timeout value is passed the command will be lasted into that interval /execute?cmd=dir+/B&timeout=1
 func instantCommandExecutor(w http.ResponseWriter, r *http.Request) {
+	// try to setup the response as not buffered data. if succeeds it will be used to flush.
+	f, ok := w.(http.Flusher)
 	w.Header().Set("Content-Type", "text/plain; charset=utf8")
-	msg := []byte("\n[+] Hello • failed to execute the command passed.\n")
-
-	// expect one value for the query - if multiple passed only first will be returned.
-	cmd := r.URL.Query().Get("cmd")
-
-	// execute listing command for windows.
-	if runtime.GOOS == "windows" {
-		if out, err := exec.Command("cmd", "/C", cmd).Output(); err == nil {
-			w.WriteHeader(200)
-			w.Write(append([]byte("\n[+] Hello • find below output of the command.\n\n"), out[:]...))
-		} else {
-			w.WriteHeader(503)
-			w.Write(append(msg, []byte(err.Error())...))
-		}
+	// expect one value for cmd and timeout query strings.
+	// if multiple passed only first will be retreived.
+	task := r.URL.Query().Get("cmd")
+	// nothing or empty value provided.
+	if len(task) == 0 {
+		w.WriteHeader(400)
+		fmt.Fprintf(w, "\n[+] The request sent is malformed • Go to https://r.Host/ to view detailed instructions.")
 		return
 	}
+	// get the request context and make it cancellable. update if task submitted with timeout option.
+	ctx, cancel := context.WithCancel(r.Context())
+	defer cancel()
 
-	// execute passed command for linux-based platforms.
-	if out, err := exec.Command(shell, "-c", cmd).Output(); err == nil {
-		w.WriteHeader(200)
-		w.Write(append([]byte("\n[+] Hello • find below output of the command.\n\n"), out[:]...))
-	} else {
-		w.WriteHeader(503)
-		w.Write(append(msg, []byte(err.Error())...))
+	if timeout, err := strconv.Atoi(r.URL.Query().Get("timeout")); err == nil && timeout > 0 {
+		ctx, _ = context.WithTimeout(ctx, time.Duration(timeout)*time.Minute)
 	}
-	w.WriteHeader(400)
-	return
+
+	var cmd *exec.Cmd
+	if runtime.GOOS == "windows" {
+		// command syntax for windows platform.
+		cmd = exec.CommandContext(ctx, "cmd", "/C", task)
+	} else {
+		// syntax for linux-based platforms.
+		cmd = exec.CommandContext(ctx, shell, "-c", task)
+	}
+
+	// combine standart output and error pipes.
+	cmd.Stderr = cmd.Stdout
+	stdout, _ := cmd.StdoutPipe()
+
+	// channel to signal all output sent.
+	done := make(chan struct{})
+	// scans the output in a line-by-line fashion and stream the content manually.
+	scanner := bufio.NewScanner(stdout)
+	go func() {
+		for scanner.Scan() {
+			fmt.Fprintf(w, scanner.Text()+"\n")
+			if ok {
+				f.Flush()
+			}
+		}
+		// all data streamed. unblock the channel.
+		done <- struct{}{}
+	}()
+
+	// start asynchronously the task.
+	if err := cmd.Start(); err != nil {
+		// no need to continue.
+		w.WriteHeader(400)
+		fmt.Fprint(w, "\n[+] failed to execute the command submitted. make sure it is valid and has all rights.")
+		return
+	}
+	w.WriteHeader(200)
+	// build an id for this job and save its pid.
+	id := generateID()
+	pid := cmd.Process.Pid
+
+	select {
+	// block until there is a hit.
+	case <-ctx.Done():
+
+		switch ctx.Err() {
+
+		case context.DeadlineExceeded:
+			// timeout reached.
+			jobslog.Printf("[%s] [%05d] timeout reached. stopped the processing of the job\n", id, pid)
+			fmt.Fprintf(w, "\n\nFinish. Timeout reached. Stopping the job process.")
+			if ok {
+				f.Flush()
+			}
+		case context.Canceled:
+			// request context cancelled - probably user closed the browser tab.
+			jobslog.Printf("[%s] [%05d] request cancelled. stopped the processing of the job\n", id, pid)
+		}
+
+		// kill the process and exit from this select loop.
+		if perr := cmd.Process.Kill(); perr != nil {
+			jobslog.Printf("[%s] [%05d] failed to kill the associated process of the job - errmsg: %v\n", id, pid, perr)
+		} else {
+			jobslog.Printf("[%16s] [%05d] succeeded to kill the associated process of the job\n", id, pid)
+		}
+
+		break
+
+	case <-done:
+		// all data sent.
+		break
+	}
+	// wait until task completes.
+	cmd.Wait()
+	jobslog.Printf("[%s] [%05d] completed the processing of the job\n", id, pid)
 }
 
 // build a string made of dash symbol - used to display table.
@@ -369,7 +433,7 @@ func executeJob(job *Job, ctx context.Context) {
 
 	if err == nil && !stopped {
 		// exited from select loop due to other reason than job stop request.
-		jobslog.Printf("[%s] [%05d] successfully completed the processing of the job\n", job.id, job.pid)
+		jobslog.Printf("[%s] [%05d] completed the processing of the job\n", job.id, job.pid)
 		job.issuccess = true
 		// success, exitCode should be 0
 		ws := cmd.ProcessState.Sys().(syscall.WaitStatus)
@@ -378,7 +442,7 @@ func executeJob(job *Job, ctx context.Context) {
 
 	if err == nil && stopped {
 		// exited from select loop due to job stop request.
-		jobslog.Printf("[%s] [%05d] successfully stopped the processing of the job\n", job.id, job.pid)
+		jobslog.Printf("[%s] [%05d] stopped the processing of the job\n", job.id, job.pid)
 		job.issuccess = true
 		// no exit code for killed process - lets leave it to -1 for reference.
 	}
@@ -471,7 +535,7 @@ func handleJobsRequests(w http.ResponseWriter, r *http.Request) {
 		mapLock.Unlock()
 		// add this job to the processing queue.
 		globalJobsQueue <- job
-		jobslog.Printf("[%s] [%05d] scheduled the new job onto the processing queue\n", job.id, job.pid)
+		jobslog.Printf("[%s] [%05d] scheduled the processing of the job\n", job.id, job.pid)
 		// stream the added job details to user/client.
 		fmt.Fprintln(w, fmt.Sprintf("|%04d | %-18s | %-14d | %-10d | %-38v | %-30s |", i+1, job.id, job.memlimit, job.cpulimit, (job.submittime).Format("2006-01-02 15:04:05"), truncateSyntax(job.task, 30)))
 		fmt.Fprintln(w, fmt.Sprintf("+%s-+-%s-+-%s-+-%s-+-%s-+-%s-+", Dashs(4), Dashs(18), Dashs(14), Dashs(10), Dashs(38), Dashs(30)))
@@ -1424,7 +1488,7 @@ func startWebServer(exit <-chan struct{}) error {
 	router := http.NewServeMux()
 	// default request - list how to details.
 	router.HandleFunc("/", webHelp)
-	// expected query string : /execute?cmd=xxxxx
+	// expected query string : /execute?cmd=xxxxx&timeout=tt
 	router.HandleFunc("/execute", instantCommandExecutor)
 	// expected query string : /jobs?cmd=xxxxx
 	router.HandleFunc("/jobs", handleJobsRequests)
