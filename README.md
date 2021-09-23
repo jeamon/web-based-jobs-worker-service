@@ -73,21 +73,27 @@ This project is developed with:
 On Windows, Linux macOS, and FreeBSD you will be able to download the pre-built binaries once available.
 If your system has [Go >= 1.13+](https://golang.org/dl/) you can pull the codebase and build from the source.
 
+
+* Build the worker program on windows
+```shell
+$ git clone https://github.com/jeamon/wweb-based-jobs-worker-service.git
+$ cd web-based-jobs-worker-service
+$ go build -o worker.exe .
 ```
 
-# build the worker program on windows
-git clone https://github.com/jeamon/wweb-based-jobs-worker-service.git && cd web-based-jobs-worker-service
-go build -o worker.exe worker.go help.go
+* Build the worker program on linux and others
+```shell
+$ git clone https://github.com/jeamon/web-based-jobs-worker-service.git
+$ cd web-based-jobs-worker-service
+$ go build -o worker .
+```
 
-# build the worker program on linux and others
-git clone https://github.com/jeamon/web-based-jobs-worker-service.git && cd web-based-jobs-worker-service
-go build -o worker worker.go help.go
-
-# build with docker for linux-based systems
-git clone https://github.com/jeamon/web-based-jobs-worker-service.git && cd web-based-jobs-worker-service
-docker build --tag unix-worker .
-docker run -d --publish 8080:8080 --name unix-worker --rm unix-worker /bin/sh -c "/app/worker start && sleep infinity"
-
+* Build with docker for linux-based systems
+```shell
+$ git clone https://github.com/jeamon/web-based-jobs-worker-service.git
+$ cd web-based-jobs-worker-service
+$ docker build --tag unix-worker .
+$ docker run -d --publish 8080:8080 --name unix-worker --rm unix-worker /bin/sh -c "/app/worker start && sleep infinity"
 ```
 
 
@@ -107,7 +113,7 @@ docker run -d --publish 8080:8080 --name unix-worker --rm unix-worker /bin/sh -c
 	```
 
 	
-* To execute a remote command and get instantly the output (replace space with + sign):
+* To execute a remote command and get the realtime output - streaming fashion:
 	
 	```
 	https://<server-ip-address>:<port>/execute?cmd=<command+argument>
