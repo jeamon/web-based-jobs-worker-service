@@ -12,6 +12,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"math/big"
@@ -60,6 +61,12 @@ const maxcount = 10
 const interval = 12
 const maxage = 24
 
+// default short task (islong = false) timeout in secs.
+const shortJobTimeout = 3600
+
+// default long task (islong = true) timeout in mins.
+const longJobTimeout = 1440
+
 // store shell name for linux-based system.
 var shell string
 
@@ -75,27 +82,33 @@ var jobslog *log.Logger
 // file name to save deamon PID.
 var pidFile = "deamon.pid"
 
-// Job has unique id with task as command to execute
-// result field will save output of the execution
-// a status (if true - means finished otherwise in progress)
-// begin and ended fields to track start & finish timestamp.
+// Job is a structure for each submitted task. A long running job output could only be streamed
+// and/or dumped to a file if specified. It can last for 24hrs (1440 mins). A short running task
+// output will only be saved into its memory buffer and can last for 1h (3600s).
 type Job struct {
-	id          string
-	pid         int
-	task        string
-	memlimit    int
-	cpulimit    int
-	timeout     int
-	iscompleted bool
-	issuccess   bool
-	exitcode    int
-	errormsg    string
-	fetchcount  int
-	stop        chan struct{}
-	result      *bytes.Buffer
-	submittime  time.Time
-	starttime   time.Time
-	endtime     time.Time
+	id          string        // auto-generated 16 hexa job id.
+	pid         int           // related job system process id.
+	task        string        // full command syntax to be executed.
+	islong      bool          // false:(short task) and true:(long task).
+	memlimit    int           // maximum allowed memory usage in MB.
+	cpulimit    int           // maximum cpu percentage allowed for the job.
+	timeout     int           // in secs for short task and mins for long task.
+	iscompleted bool          // specifies if job is running or not.
+	issuccess   bool          // job terminated without error.
+	exitcode    int           // 0: success or -1: default & stopped.
+	errormsg    string        // store any error during execution.
+	fetchcount  int           // number of times result queried.
+	stop        chan struct{} // helps notify to kill the job process.
+	outpipe     io.ReadCloser // job process default std output/error pipe.
+	outstream   io.Reader     // makes available output for streaming.
+	isstreaming bool          // if stream already being consumed over a websocket.
+	lock        *sync.RWMutex // job level mutex for access synchronization.
+	result      *bytes.Buffer // in memory buffer to store output.
+	file        *os.File      // disk file where to stream long job output.
+	dump        bool          // if true then save output to disk file.
+	submittime  time.Time     // datetime job was submitted.
+	starttime   time.Time     // datetime job was started.
+	endtime     time.Time     // datetime job was terminated.
 }
 
 // jobs allocator buffer (max jobs to into batch).
@@ -233,7 +246,7 @@ func instantCommandExecutor(w http.ResponseWriter, r *http.Request) {
 	// nothing or empty value provided.
 	if len(task) == 0 {
 		w.WriteHeader(400)
-		fmt.Fprintf(w, "\n[+] The request sent is malformed • Go to https://r.Host/ to view detailed instructions.")
+		fmt.Fprintf(w, fmt.Sprintf("\n[+] The request sent is malformed • Go to https://%v/ to view detailed instructions.", r.Host))
 		return
 	}
 	// get the request context and make it cancellable. update if task submitted with timeout option.
@@ -328,11 +341,14 @@ func Dashs(count int) string {
 // executeJob takes a job structure and will execute the task and add the result to the global results bus.
 func executeJob(job *Job, ctx context.Context) {
 	job.starttime = time.Now().UTC()
-
+	var err error
 	jobctx := ctx
-	if job.timeout > 0 {
-		// job has timeout option provided into minutes.
+	if job.islong {
+		// long running job so timeout option provided into minutes.
 		jobctx, _ = context.WithTimeout(ctx, time.Duration(job.timeout)*time.Minute)
+	} else {
+		// short running job so timeout option provided into seconds.
+		jobctx, _ = context.WithTimeout(ctx, time.Duration(job.timeout)*time.Second)
 	}
 
 	jobslog.Printf("[%s] [%05d] starting the processing of the job\n", job.id, job.pid)
@@ -346,10 +362,53 @@ func executeJob(job *Job, ctx context.Context) {
 		cmd = exec.CommandContext(jobctx, shell, "-c", job.task)
 	}
 
-	// set the job result field for combined output.
-	cmd.Stdout, cmd.Stderr = job.result, job.result
+	// combine standard process pipes, stdout & stderr.
+	cmd.Stderr = cmd.Stdout
 
-	// asynchronous start
+	if job.islong && !job.dump {
+		// long running job without saving to disk file so we only store the standard pipe for further streaming.
+		job.outpipe, err = cmd.StdoutPipe()
+		if err != nil {
+			// job should be streaming so abort this job scheduling.
+			job.endtime = time.Now().UTC()
+			job.iscompleted = true
+			jobslog.Printf("[%s] [%05d] error occured during the scheduling of the job - errmsg: %v\n", job.id, job.pid, err)
+			job.issuccess = false
+			job.errormsg = err.Error()
+		}
+	} else if job.islong && job.dump {
+		// long running job and user requested to save output to disk file.
+		// construct the filename based on job id and submitted time.
+		filename := fmt.Sprintf("%s%s%s-%s%s%s", job.submittime.Year(), job.submittime.Month(), job.submittime.Day(), job.submittime.Hour(), job.submittime.Minute(), job.submittime.Second())
+		job.file, err = os.OpenFile(fmt.Sprintf("%s.%s.txt", job.id, filename), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
+		defer (job.file).Close()
+		if err != nil {
+			// cannot satisfy the output dumping so abort the process.
+			jobslog.Printf("[%s] [%05d] failed to create or open saving file for the job - errmsg: %v\n", job.id, job.pid, err)
+			job.endtime = time.Now().UTC()
+			job.iscompleted = true
+			jobslog.Printf("[%s] [%05d] error occured during the scheduling of the job - errmsg: %v\n", job.id, job.pid, err)
+			job.issuccess = false
+			job.errormsg = err.Error()
+			return
+		}
+		// duplicate the output stream for streaming to the disk file and keep the second for user streaming.
+		outpipe, err := cmd.StdoutPipe()
+		if err != nil {
+			// job should be streaming so abort this job scheduling.
+			job.endtime = time.Now().UTC()
+			job.iscompleted = true
+			jobslog.Printf("[%s] [%05d] error occured during the scheduling of the job - errmsg: %v\n", job.id, job.pid, err)
+			job.issuccess = false
+			job.errormsg = err.Error()
+		}
+		job.outstream = io.TeeReader(outpipe, job.file)
+	} else {
+		// short running job so set the output to result memory buffer.
+		cmd.Stdout = job.result
+	}
+
+	// asynchronously starting the job.
 	if err := cmd.Start(); err != nil {
 		// no need to continue - add job stats to map.
 		job.endtime = time.Now().UTC()
@@ -357,14 +416,11 @@ func executeJob(job *Job, ctx context.Context) {
 		job.issuccess = false
 		job.errormsg = err.Error()
 		job.iscompleted = true
-		//mapLock.Lock()
-		//globalJobsResults[job.id] = job
-		//mapLock.Unlock()
 		return
 	}
 	// job process started.
 	job.pid = cmd.Process.Pid
-
+	jobslog.Printf("[%s] [%05d] started the processing of the job\n", job.id, job.pid)
 	// var err error
 	done := make(chan error)
 
@@ -372,7 +428,7 @@ func executeJob(job *Job, ctx context.Context) {
 		done <- cmd.Wait()
 	}()
 
-	var err error
+	err = nil
 	// track if job stop was requested or not.
 	stopped := false
 	// block on select until one case hits.
@@ -457,7 +513,6 @@ func jobsMonitor(exit <-chan struct{}, wg *sync.WaitGroup) {
 	for {
 		select {
 		case job := <-globalJobsQueue:
-			// go execute(job, ctx)
 			go executeJob(job, ctx)
 		case <-exit:
 			// signal to stop monitoring - notify all executors to stop as well.
@@ -491,6 +546,7 @@ func handleJobsRequests(w http.ResponseWriter, r *http.Request) {
 	// default memory (megabytes) and cpu (percentage) limit values.
 	memlimit := 100
 	cpulimit := 10
+	timeout := shortJobTimeout
 	// extract only first value of mem and cpu query string.
 	if m, err := strconv.Atoi(query.Get("mem")); err == nil && m > 0 {
 		memlimit = m
@@ -498,6 +554,10 @@ func handleJobsRequests(w http.ResponseWriter, r *http.Request) {
 
 	if c, err := strconv.Atoi(query.Get("cpu")); err == nil && c > 0 {
 		cpulimit = c
+	}
+	// retreive timeout parameter value and consider it if higher than 0.
+	if t, err := strconv.Atoi(query.Get("timeout")); err == nil && t > 0 && t <= shortJobTimeout {
+		timeout = t
 	}
 	w.WriteHeader(200)
 	w.Write([]byte("\n[+] find below some details of the jobs submitted\n\n"))
@@ -516,15 +576,19 @@ func handleJobsRequests(w http.ResponseWriter, r *http.Request) {
 			id:          generateID(),
 			pid:         0,
 			task:        cmd,
+			islong:      false,
 			iscompleted: false,
 			issuccess:   false,
 			exitcode:    -1,
 			errormsg:    "",
 			fetchcount:  0,
 			stop:        make(chan struct{}, 1),
+			lock:        &sync.RWMutex{},
 			result:      new(bytes.Buffer),
+			dump:        false,
 			memlimit:    memlimit,
 			cpulimit:    cpulimit,
+			timeout:     timeout,
 			submittime:  time.Now().UTC(),
 			starttime:   time.Time{},
 			endtime:     time.Time{},
@@ -1115,8 +1179,8 @@ func getDeamonStatus() (err error) {
 	}
 
 	// send dummy signal 0 to that process.
-	if err = process.Signal(syscall.Signal(0)); err != nil {
-		fmt.Printf("no process with pid %d - removing PID file\n", pid)
+	if err = process.Signal(syscall.Signal(0)); err != nil && err == syscall.ESRCH {
+		fmt.Printf("process with pid %d is not running - removing the pid file\n", pid)
 		os.Remove(pidFile)
 		// set back to 0 so defer function can display inactive status.
 		pid = 0
@@ -1488,32 +1552,41 @@ func startWebServer(exit <-chan struct{}) error {
 	router := http.NewServeMux()
 	// default request - list how to details.
 	router.HandleFunc("/", webHelp)
-	// expected query string : /execute?cmd=xxxxx&timeout=tt
+	// expected request : /execute?cmd=<task-syntax>&timeout=<value>
 	router.HandleFunc("/execute", instantCommandExecutor)
-	// expected query string : /jobs?cmd=xxxxx
+	// expected request : /jobs?cmd=<task-syntax>
 	router.HandleFunc("/jobs", handleJobsRequests)
-	// expected query string : /jobs/status?id=xxxxx
+	// expected request : /jobs/status?id=<jobid>
 	router.HandleFunc("/jobs/status", checkJobsStatusById)
-	// expected query string : /jobs/results?id=xxxxx
+	// expected format : /jobs/results?id=<jobid>
 	router.HandleFunc("/jobs/results", getJobsResultsById)
-	// expected URI : /jobs/status/?order=asc|desc or /jobs/stats/?order=asc|desc
+	// expected request : /jobs/status/?order=asc|desc or /jobs/stats/?order=asc|desc
 	router.HandleFunc("/jobs/status/", getAllJobsStatus)
 	router.HandleFunc("/jobs/stats/", getAllJobsStatus)
-	// expected query string : /jobs/stop?id=xxx&id=xxx
+	// expected request : /jobs/stop?id=<jobid>&id=<jobid>
 	router.HandleFunc("/jobs/stop", stopJobsById)
-	// expected query string : /jobs/stop/
+	// expected request : /jobs/stop/
 	router.HandleFunc("/jobs/stop/", stopAllJobs)
-	// expected query string : /jobs/restart?id=xxx&id=xxx
+	// expected request : /jobs/restart?id=<jobid>&id=<jobid>
 	router.HandleFunc("/jobs/restart", restartJobsById)
-	// expected query string : /jobs/restart/
+	// expected request : /jobs/restart/
 	router.HandleFunc("/jobs/restart/", restartAllJobs)
+
+	// live streaming a long running job output: /jobs/results/stream?id=<jobid>
+	router.HandleFunc("/jobs/results/stream", streamJobsResultsById)
+	// schedule a long running job with output streaming capability.
+	// /jobs/long/stream?cmd=<task>&cmd=<task>&timeout=<value>&save=true|false
+	router.HandleFunc("/jobs/long/stream", scheduleLongJobsWithStreaming)
+	// schedule a long running job with only streaming output to disk file.
+	// /jobs/long/dump?cmd=<task>&cmd=<task>&timeout=<value>
+	// router.HandleFunc("/jobs/long/dump", scheduleLongJobsWithDumping)
 
 	webserver := &http.Server{
 		Addr:         address,
 		Handler:      logRequestMiddleware(router),
 		ErrorLog:     weblog,
 		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
+		WriteTimeout: 60 * time.Second,
 		IdleTimeout:  60 * time.Second,
 		TLSConfig:    tlsConfig,
 	}
