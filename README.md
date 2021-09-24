@@ -34,9 +34,10 @@ for fast access.
 All jobs could be stopped or restarted as well. When a job restart is requested, in case this job is still running, it will only be stopped and you will need to restart it
 again in order to have it scheduled for processing. If already completed it will be immediately scheduled for processing.
 
-Finally, you can submit a single job and wait until it completes to view its result output immediately. Each start of the worker service creates three logs files. One file logs
-all web requests, another for each job processing details and the third one for recording each job details deleted by the cleanup background routine. The worker itself logs its
-standard output and standard error into a single file named worker(.)log. You can view all the features APIs exposed by the web server under the [usage section](#usage).
+Finally, you can submit a single job and wait until it completes to view its result output immediately. Or you can submit a long running job and view in realtime (in streaming)
+it log output. Each start of the worker service creates three logs files. One file logs all web requests, another for each job processing details and the third one for recording
+each job details deleted by the cleanup background routine. The worker itself logs its standard output and standard error into a single file named worker(.)log. You can view all
+the features APIs exposed by the web server under the [usage section](#usage).
 
 
 ## Features
@@ -55,6 +56,9 @@ Below is a summary of available features. This section will be updated as projec
 * per startup web server log and jobs log and deletion cron log 
 * https-only local web server with auto-generated self-signed certificate 
 * capability to restart one or more jobs by their ids or restart all jobs
+* schedule a long running task and start viewing the job output in realtime
+* schedule multiple long running jobs and use their id for live streaming their output
+* schedule a long running task with dual streaming (to a disk file and over websocket)
 
 
 Please feel free to have a look at the [usage section](#usage) for examples.
@@ -113,7 +117,7 @@ $ docker run -d --publish 8080:8080 --name unix-worker --rm unix-worker /bin/sh 
 	```
 
 	
-* To execute a remote command and get the realtime output - streaming fashion:
+* To execute a short remote task (optionally with timeout in secs) and get the realtime output:
 	
 	```
 	https://<server-ip-address>:<port>/execute?cmd=<command+argument>
@@ -123,7 +127,7 @@ $ docker run -d --publish 8080:8080 --name unix-worker --rm unix-worker /bin/sh 
 	```
 	example: https://127.0.0.1:8080/execute?cmd=systeminfo
 	example: https://127.0.0.1:8080/execute?cmd=ipconfig+/all
-	example: https://127.0.0.1:8080/execute?cmd=netstat+-an+|+findstr+ESTAB
+	example: https://127.0.0.1:8080/execute?cmd=netstat+-an+|+findstr+ESTAB&timeout=45
 	```
 
 	[+] On Linux Operating System.
@@ -131,6 +135,44 @@ $ docker run -d --publish 8080:8080 --name unix-worker --rm unix-worker /bin/sh 
 	example: https://127.0.0.1:8080/execute?cmd=ls+-la
 	example: https://127.0.0.1:8080/execute?cmd=ip+a
 	example: https://127.0.0.1:8080/execute?cmd=ps
+	```
+
+
+* To execute a long running remote task (optionally with timeout in mins and dumping to file) and get the realtime output:
+	
+	```
+	https://<server-ip-address>:<port>/jobs/long/stream?cmd=<command+argument>&timeout=<value>&dump=<true|false>
+	```
+	
+	[+] On Windows Operating System.
+	```
+	example: https://127.0.0.1:8080/jobs/long/stream?cmd=ping+127.0.0.1+-t&dump=true
+	example: https://127.0.0.1:8080/jobs/long/stream?cmd=netstat+-an+|+findstr+ESTAB&timeout=60
+	```
+
+	[+] On Linux Operating System.
+	```
+	example: https://127.0.0.1:8080/jobs/long/stream?cmd=ping+127.0.0.1&dump=true
+	example: https://127.0.0.1:8080/jobs/long/stream?cmd=top&timeout=10&dump=true
+	```
+
+
+* To execute multiple long running remote task (optionally with timeout in mins) and use their ids to get their realtime outputs:
+	
+	```
+	https://<server-ip-address>:<port>/jobs/long/stream?cmd=<command+argument>&cmd=<command+argument>&timeout=<value>
+	```
+	
+	[+] On Windows Operating System.
+	```
+	example: https://127.0.0.1:8080/jobs/long/stream?cmd=ping+4.4.4.4+-t&cmd=ping+8.8.8.8+-t&timeout=30
+	example: https://127.0.0.1:8080/jobs/long/stream?cmd=netstat+-an+|+findstr+ESTAB&netstat+-an+|+findstr+ESTAB&timeout=15
+	```
+
+	[+] On Linux Operating System.
+	```
+	example: https://127.0.0.1:8080/jobs/long/stream?cmd=ping+4.4.4.4&cmd=ping+8.8.8.8&cmd=ping+1.1.1.1&timeout=30
+	example: https://127.0.0.1:8080/jobs/long/stream?cmd=&cmd=tail+-f/var/log/syslog&cmd=tail+-f+/var/log/messages&timeout=30
 	```
 
 
@@ -248,7 +290,14 @@ $ docker run -d --publish 8080:8080 --name unix-worker --rm unix-worker /bin/sh 
 * add URI and handler to download execution output of one or multiple jobs by ids 
 * add command line options on worker service to list or delete jobs or dump jobs output
 * add feature to move worker service into maintenance mode - stop accepting jobs
-* add log/output streaming capability for a given job with the use of websocket
+* add URI & handler to schedule multiple long running jobs and stream their output to files
+* add for each job its memory buffer size and timeout value when displaying status / statistics
+* limit the overall number of jobs scheduling to 10K and make it dynamically configurable
+* embed websocket html/JS template file into executable by leveraging golang 1.16 feature
+* do not restart long running jobs when user request to restart all jobs
+* into background deletion service, only stop running job
+* rename short running jobs URI & handler to /jobs/short?cmd=x and scheduleShortRunningJobs
+
 
 
 ## Contribution
