@@ -560,10 +560,10 @@ func scheduleShortRunningJobs(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("\n[+] find below some details of the jobs submitted\n\n"))
 
 	// format the display table.
-	title := fmt.Sprintf("|%-4s | %-18s | %-5s | %-5s | %-7s | %-38s | %-30s |", "Nb", "Job ID", "Mem", "CPU%", "Timeout", "Submitted At [UTC]", "Command Syntax")
+	title := fmt.Sprintf("|%-4s | %-18s | %-5s | %-5s | %-7s | %-20s | %-30s |", "Nb", "Job ID", "Mem", "CPU%", "Timeout", "Submitted At [UTC]", "Command Syntax")
 	fmt.Fprintln(w, strings.Repeat("=", len(title)))
 	fmt.Fprintln(w, title)
-	fmt.Fprintf(w, fmt.Sprintf("+%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+\n", Dashs(4), Dashs(18), Dashs(5), Dashs(5), Dashs(7), Dashs(38), Dashs(30)))
+	fmt.Fprintf(w, fmt.Sprintf("+%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+\n", Dashs(4), Dashs(18), Dashs(5), Dashs(5), Dashs(7), Dashs(20), Dashs(30)))
 	if ok {
 		f.Flush()
 	}
@@ -598,8 +598,8 @@ func scheduleShortRunningJobs(w http.ResponseWriter, r *http.Request) {
 		globalJobsQueue <- job
 		jobslog.Printf("[%s] [%05d] scheduled the processing of the job\n", job.id, job.pid)
 		// stream the added job details to user/client.
-		fmt.Fprintln(w, fmt.Sprintf("|%04d | %-18s | %-5d | %-5d | %-7d | %-38v | %-30s |", i+1, job.id, job.memlimit, job.cpulimit, job.timeout, (job.submittime).Format("2006-01-02 15:04:05"), truncateSyntax(job.task, 30)))
-		fmt.Fprintf(w, fmt.Sprintf("+%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+\n", Dashs(4), Dashs(18), Dashs(5), Dashs(5), Dashs(7), Dashs(38), Dashs(30)))
+		fmt.Fprintln(w, fmt.Sprintf("|%04d | %-18s | %-5d | %-5d | %-7d | %-20v | %-30s |", i+1, job.id, job.memlimit, job.cpulimit, job.timeout, (job.submittime).Format("2006-01-02 15:04:05"), truncateSyntax(job.task, 30)))
+		fmt.Fprintf(w, fmt.Sprintf("+%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+\n", Dashs(4), Dashs(18), Dashs(5), Dashs(5), Dashs(7), Dashs(20), Dashs(30)))
 		if ok {
 			f.Flush()
 		}
@@ -858,6 +858,8 @@ func restartAllJobs(w http.ResponseWriter, r *http.Request) {
 func resetCompletedJobInfos(j *Job) {
 	j.pid = 0
 	j.iscompleted, j.issuccess = false, false
+	j.fetchcount = 0
+	j.isstreaming = false
 	j.exitcode = -1
 	j.errormsg = ""
 	j.starttime, j.endtime = time.Time{}, time.Time{}
@@ -904,10 +906,10 @@ func checkJobsStatusById(w http.ResponseWriter, r *http.Request) {
 		f.Flush()
 	}
 	// format the display table.
-	title := fmt.Sprintf("|%-4s | %-18s | %-5s | %-6s | %-10s | %-12s | %-10s | %-5s | %-5s | %-7s | %-20s | %-20s | %-20s | %-30s |", "Nb", "Job ID", "PID", "Done", "Success", "Exit Code", "Count", "Mem", "CPU%", "Timeout", "Submitted At [UTC]", "Started At [UTC]", "Ended At [UTC]", "Command Syntax")
+	title := fmt.Sprintf("|%-4s | %-16s | %-5s | %-5s | %-5s | %-7s | %-9s | %-10s | %-5s | %-5s | %-7s | %-20s | %-20s | %-20s | %-30s |", "Nb", "Job ID", "PID", "Long", "Done", "Success", "Exit Code", "Count", "Mem", "CPU%", "Timeout", "Submitted At [UTC]", "Started At [UTC]", "Ended At [UTC]", "Command Syntax")
 	fmt.Fprintln(w, strings.Repeat("=", len(title)))
 	fmt.Fprintln(w, title)
-	fmt.Fprintf(w, fmt.Sprintf("+%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+\n", Dashs(4), Dashs(18), Dashs(5), Dashs(6), Dashs(10), Dashs(12), Dashs(10), Dashs(5), Dashs(5), Dashs(7), Dashs(20), Dashs(20), Dashs(20), Dashs(30)))
+	fmt.Fprintf(w, fmt.Sprintf("+%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+\n", Dashs(4), Dashs(16), Dashs(5), Dashs(5), Dashs(5), Dashs(7), Dashs(9), Dashs(10), Dashs(5), Dashs(5), Dashs(7), Dashs(20), Dashs(20), Dashs(20), Dashs(30)))
 	if ok {
 		f.Flush()
 	}
@@ -940,8 +942,8 @@ func checkJobsStatusById(w http.ResponseWriter, r *http.Request) {
 			end = (job.endtime).Format("2006-01-02 15:04:05")
 		}
 		// stream the added job details to user/client.
-		fmt.Fprintln(w, fmt.Sprintf("|%04d | %-18s | %05d | %-6v | %-10v | %-12d | %-10d | %-5d | %-5d | %-7d | %-20v | %-20v | %-20v | %-30s |", i, job.id, job.pid, job.iscompleted, job.issuccess, job.exitcode, job.fetchcount, job.memlimit, job.cpulimit, job.timeout, (job.submittime).Format("2006-01-02 15:04:05"), start, end, truncateSyntax(job.task, 30)))
-		fmt.Fprintf(w, fmt.Sprintf("+%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+\n", Dashs(4), Dashs(18), Dashs(5), Dashs(6), Dashs(10), Dashs(12), Dashs(10), Dashs(5), Dashs(5), Dashs(7), Dashs(20), Dashs(20), Dashs(20), Dashs(30)))
+		fmt.Fprintln(w, fmt.Sprintf("|%04d | %-16s | %05d | %-5v | %-5v | %-7v | %-9d | %-10d | %-5d | %-5d | %-7d | %-20v | %-20v | %-20v | %-30s |", i, job.id, job.pid, job.islong, job.iscompleted, job.issuccess, job.exitcode, job.fetchcount, job.memlimit, job.cpulimit, job.timeout, (job.submittime).Format("2006-01-02 15:04:05"), start, end, truncateSyntax(job.task, 30)))
+		fmt.Fprintf(w, fmt.Sprintf("+%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+\n", Dashs(4), Dashs(16), Dashs(5), Dashs(5), Dashs(5), Dashs(7), Dashs(9), Dashs(10), Dashs(5), Dashs(5), Dashs(7), Dashs(20), Dashs(20), Dashs(20), Dashs(30)))
 		if ok {
 			f.Flush()
 		}
@@ -969,15 +971,15 @@ func getAllJobsStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Write([]byte("\n[+] status of all current jobs [job <done> with <exitcode> -1 means stopped, <mem> is memory limit in megabytes] - zoom in/out to fit the screen\n\n"))
+	w.Write([]byte("\n[+] status of all current jobs [job <done> with <exitcode> -1 means stopped, <mem> is memory limit in megabytes, <long> means long running job] - zoom in/out to fit the screen\n\n"))
 	if ok {
 		f.Flush()
 	}
 	// format the display table.
-	title := fmt.Sprintf("|%-4s | %-18s | %-5s | %-6s | %-10s | %-12s | %-10s | %-5s | %-5s | %-7s | %-20s | %-20s | %-20s | %-30s |", "Nb", "Job ID", "PID", "Done", "Success", "Exit Code", "Count", "Mem", "CPU%", "Timeout", "Submitted At [UTC]", "Started At [UTC]", "Ended At [UTC]", "Command Syntax")
+	title := fmt.Sprintf("|%-4s | %-16s | %-5s | %-5s | %-5s | %-7s | %-9s | %-10s | %-5s | %-5s | %-7s | %-20s | %-20s | %-20s | %-30s |", "Nb", "Job ID", "PID", "Long", "Done", "Success", "Exit Code", "Count", "Mem", "CPU%", "Timeout", "Submitted At [UTC]", "Started At [UTC]", "Ended At [UTC]", "Command Syntax")
 	fmt.Fprintln(w, strings.Repeat("=", len(title)))
 	fmt.Fprintln(w, title)
-	fmt.Fprintf(w, fmt.Sprintf("+%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+\n", Dashs(4), Dashs(18), Dashs(5), Dashs(6), Dashs(10), Dashs(12), Dashs(10), Dashs(5), Dashs(5), Dashs(7), Dashs(20), Dashs(20), Dashs(20), Dashs(30)))
+	fmt.Fprintf(w, fmt.Sprintf("+%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+\n", Dashs(4), Dashs(16), Dashs(5), Dashs(5), Dashs(5), Dashs(7), Dashs(9), Dashs(10), Dashs(5), Dashs(5), Dashs(7), Dashs(20), Dashs(20), Dashs(20), Dashs(30)))
 	if ok {
 		f.Flush()
 	}
@@ -1037,9 +1039,10 @@ func getAllJobsStatus(w http.ResponseWriter, r *http.Request) {
 		} else {
 			end = (job.endtime).Format("2006-01-02 15:04:05")
 		}
+
 		// stream the added job details to user/client.
-		fmt.Fprintln(w, fmt.Sprintf("|%04d | %-18s | %05d | %-6v | %-10v | %-12d | %-10d | %-5d | %-5d | %-7d | %-20v | %-20v | %-20v | %-30s |", i, job.id, job.pid, job.iscompleted, job.issuccess, job.exitcode, job.fetchcount, job.memlimit, job.cpulimit, job.timeout, (job.submittime).Format("2006-01-02 15:04:05"), start, end, truncateSyntax(job.task, 30)))
-		fmt.Fprintf(w, fmt.Sprintf("+%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+\n", Dashs(4), Dashs(18), Dashs(5), Dashs(6), Dashs(10), Dashs(12), Dashs(10), Dashs(5), Dashs(5), Dashs(7), Dashs(20), Dashs(20), Dashs(20), Dashs(30)))
+		fmt.Fprintln(w, fmt.Sprintf("|%04d | %-16s | %05d | %-5v | %-5v | %-7v | %-9d | %-10d | %-5d | %-5d | %-7d | %-20v | %-20v | %-20v | %-30s |", i, job.id, job.pid, job.islong, job.iscompleted, job.issuccess, job.exitcode, job.fetchcount, job.memlimit, job.cpulimit, job.timeout, (job.submittime).Format("2006-01-02 15:04:05"), start, end, truncateSyntax(job.task, 30)))
+		fmt.Fprintf(w, fmt.Sprintf("+%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+\n", Dashs(4), Dashs(16), Dashs(5), Dashs(5), Dashs(5), Dashs(7), Dashs(9), Dashs(10), Dashs(5), Dashs(5), Dashs(7), Dashs(20), Dashs(20), Dashs(20), Dashs(30)))
 		if ok {
 			f.Flush()
 		}
@@ -1093,7 +1096,7 @@ func cleanupMapResults(interval int, maxcount int, deadtime int, exit <-chan str
 			// waiting time passed so lock the map and loop over each (*job).
 			mapLock.Lock()
 			for id, job := range globalJobsResults {
-				if (*job).fetchcount > maxcount || (time.Since((*job).endtime) > (time.Duration(deadtime) * time.Minute)) {
+				if job.fetchcount > maxcount || (time.Since(job.endtime) > (time.Duration(deadtime) * time.Minute)) {
 					// remove job which was terminated since deadtime hours or requested 10 times.
 					delete(globalJobsResults, id)
 					deletedjobslog.Printf("[%s] [%05d] cleanup routine removed job from the results queue\n", id, job.id)
