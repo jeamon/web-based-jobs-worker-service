@@ -524,23 +524,20 @@ func jobsMonitor(exit <-chan struct{}, wg *sync.WaitGroup) {
 	}
 }
 
-// handleJobsRequests handles user jobs submission request and build the jobs structure for further processing.
-func handleJobsRequests(w http.ResponseWriter, r *http.Request) {
+// scheduleShortRunningJobs handles user submitted short running jobs (<islong> field will be set to false)
+// requests and build the required jobs structure for immediate processing scheduling.
+func scheduleShortRunningJobs(w http.ResponseWriter, r *http.Request) {
 
 	// try to setup the response as not buffered data. if succeeds it will be used to flush.
 	f, ok := w.(http.Flusher)
-
 	w.Header().Set("Content-Type", "text/plain; charset=utf8")
-	//	msg := []byte("\n[+] Hello • failed to execute the command passed.\n")
-	help := []byte("\n[+] Hello • The request sent is malformed • The expected format is :\n http://server-ip:8080/jobs?cmd=xxx&cmd=xxx&mem=megabitsValue&cpu=percentageValue\n")
-
 	// parse all query strings.
 	query := r.URL.Query()
 	cmds, exist := query["cmd"]
 	if !exist || len(cmds) == 0 {
 		// request does not contains query string cmd.
 		w.WriteHeader(400)
-		w.Write(help)
+		fmt.Fprintf(w, "\n[+] Sorry, the request submitted is malformed. The expected format is :\n http://server-ip:8080jobs/short?cmd=xxx&cmd=xxx&mem=<value>&cpu=<value>&timeout=<value>\n")
 		return
 	}
 	// default memory (megabytes) and cpu (percentage) limit values.
@@ -1560,8 +1557,8 @@ func startWebServer(exit <-chan struct{}) error {
 	router.HandleFunc("/", webHelp)
 	// expected request : /execute?cmd=<task-syntax>&timeout=<value>
 	router.HandleFunc("/execute", instantCommandExecutor)
-	// expected request : /jobs?cmd=<task-syntax>
-	router.HandleFunc("/jobs", handleJobsRequests)
+	// expected request : jobs/short?cmd=<task-syntax>
+	router.HandleFunc("/jobs", scheduleShortRunningJobs)
 	// expected request : /jobs/status?id=<jobid>
 	router.HandleFunc("/jobs/status", checkJobsStatusById)
 	// expected format : /jobs/results?id=<jobid>
