@@ -13,6 +13,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"os"
+	"log"
 )
 
 // characteristics to apply when moving to connection to websocket.
@@ -26,7 +28,33 @@ var connectionUpgradeRegex = regexp.MustCompile("(^|.*,\\s*)upgrade($|\\s*,)")
 var tmpl *template.Template
 
 func init() {
+	// compile stream web page template.
 	tmpl = template.Must(template.ParseFiles("websocket.html"))
+	// create job outputs files.
+	createOutputsFolder()
+}
+
+// createOutputsFolder makes sure that "outputs" folder if present - if not create it.
+func createOutputsFolder() {
+	info, err := os.Stat("outputs")
+	if !os.IsExist(err) {
+		// path does not exist.
+		err := os.Mkdir("outputs", 0755)
+		if err != nil {
+			log.Printf("failed create %q folder - errmsg : %v\n", "outputs", err)
+			// try to remove PID file.
+			os.Remove(pidFile)
+			os.Exit(1)
+		}
+	} else {
+		// path already exists but could be file or directory.
+		if !info.IsDir() {
+			log.Printf("path %q exists but it is not a folder so please check before continue - errmsg : %v\n", "outputs", err)
+			// try to remove PID file.
+			os.Remove(pidFile)
+			os.Exit(0)
+		}
+	}
 }
 
 // serveStreamPage delivers the web page which contains javascript code to initiate websocket connection.
@@ -147,16 +175,16 @@ func streamJob(ws *websocket.Conn, id string) {
 				jobslog.Printf("[%s] [%05d] completed the streaming and processing of the job\n", id, job.pid)
 				ws.WriteMessage(websocket.TextMessage, []byte("\n\nJob completed. No more stream."))
 				return
-			} else if job.iscompleted == false {
+			} else if err != io.EOF && job.iscompleted == false {
 				// error happened during stream reading. close this streaming session.
 				jobslog.Printf("[%s] [%05d] error when reading output stream of the job - errmsg: %v\n", id, job.pid, err)
-				ws.WriteMessage(websocket.TextMessage, []byte("\n\nOoops, error occured on server side. Job still running. Retry the streaming."))
+				ws.WriteMessage(websocket.TextMessage, []byte("\n\nOoops, error occured. Job might still be running. Retry the streaming or stop/restart the job."))
 				return
 			} else {
 				// unexpected error - must be reported for investigation.
 				// error happened during stream reading. close this streaming session.
 				jobslog.Printf("[%s] [%05d] unexpected error when reading output stream of the job - errmsg: %v\n", id, job.pid, err)
-				ws.WriteMessage(websocket.TextMessage, []byte("\n\nOoops, unexpected error occured on server side. Retry the streaming or Report to admin for investigation."))
+				ws.WriteMessage(websocket.TextMessage, []byte("\n\nOoops, unexpected error occured on server side. Retry the streaming or report for investigation."))
 				return
 			}
 		}

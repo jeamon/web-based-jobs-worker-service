@@ -380,7 +380,7 @@ func executeJob(job *Job, ctx context.Context) {
 	} else if job.islong && job.dump {
 		// long running job and user requested to save output to disk file.
 		// construct the filename based on job submitted time and its id.
-		job.filename = fmt.Sprintf("%02d%02d%02d.%s.txt", job.submittime.Year(), job.submittime.Month(), job.submittime.Day(), job.id)
+		job.filename = fmt.Sprintf("outputs/%02d%02d%02d.%s.txt", job.submittime.Year(), job.submittime.Month(), job.submittime.Day(), job.id)
 		file, err := os.OpenFile(job.filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
 		if err != nil {
 			// cannot satisfy the output dumping so abort the process.
