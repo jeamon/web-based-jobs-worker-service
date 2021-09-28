@@ -69,7 +69,8 @@ Please feel free to have a look at the [usage section](#usage) for examples.
 
 This project is developed with:
 * Golang version: 1.13+
-* Native libraries only
+* Golang Native packages
+* [Gorilla Websocket Package](https://pkg.go.dev/github.com/gorilla/websocket)
 
 
 ## Setup
@@ -90,6 +91,7 @@ $ go build -o worker.exe .
 $ git clone https://github.com/jeamon/web-based-jobs-worker-service.git
 $ cd web-based-jobs-worker-service
 $ go build -o worker .
+$ chmod +x ./worker
 ```
 
 * Build with docker for linux-based systems
@@ -117,167 +119,166 @@ $ docker run -d --publish 8080:8080 --name unix-worker --rm unix-worker /bin/sh 
 	```
 
 	
-* To execute a short remote task (optionally with timeout in secs) and get the realtime output:
+* To execute a quick remote command (optionally with timeout in secs) and get the realtime output:
 	
 	```
-	https://<server-ip-address>:<port>/execute?cmd=<command+argument>
+	https://<server-ip-address>:<port>/worker/v1/cmd/execute?cmd=<command+argument>
 	```
 	
 	[+] On Windows Operating System.
 	```
-	example: https://127.0.0.1:8080/execute?cmd=systeminfo
-	example: https://127.0.0.1:8080/execute?cmd=ipconfig+/all
-	example: https://127.0.0.1:8080/execute?cmd=netstat+-an+|+findstr+ESTAB&timeout=45
+	example: https://127.0.0.1:8080/worker/v1/cmd/execute?cmd=systeminfo
+	example: https://127.0.0.1:8080/worker/v1/cmd/execute?cmd=ipconfig+/all
+	example: https://127.0.0.1:8080/worker/v1/cmd/execute?cmd=netstat+-an+|+findstr+ESTAB&timeout=45
 	```
 
 	[+] On Linux Operating System.
 	```
-	example: https://127.0.0.1:8080/execute?cmd=ls+-la
-	example: https://127.0.0.1:8080/execute?cmd=ip+a
-	example: https://127.0.0.1:8080/execute?cmd=ps
+	example: https://127.0.0.1:8080/worker/v1/cmd/execute?cmd=ls+-la
+	example: https://127.0.0.1:8080/worker/v1/cmd/execute?cmd=ip+a
+	example: https://127.0.0.1:8080/worker/v1/cmd/execute?cmd=ps
 	```
 
 
 * To execute a long running remote task (optionally with timeout in mins and dumping to file) and get the realtime output:
 	
 	```
-	https://<server-ip-address>:<port>/jobs/long/stream?cmd=<command+argument>&timeout=<value>&dump=<true|false>
+	https://<server-ip-address>:<port>/worker/v1/jobs/long/stream/schedule?cmd=<command+argument>&timeout=<value>&dump=<true|false>
 	```
 	
 	[+] On Windows Operating System.
 	```
-	example: https://127.0.0.1:8080/jobs/long/stream?cmd=ping+127.0.0.1+-t&dump=true
-	example: https://127.0.0.1:8080/jobs/long/stream?cmd=netstat+-an+|+findstr+ESTAB&timeout=60
+	example: https://127.0.0.1:8080/worker/v1/jobs/long/stream/schedule?cmd=ping+127.0.0.1+-t&dump=true
+	example: https://127.0.0.1:8080/worker/v1/jobs/long/stream/schedule?cmd=netstat+-an+|+findstr+ESTAB&timeout=60
 	```
 
 	[+] On Linux Operating System.
 	```
-	example: https://127.0.0.1:8080/jobs/long/stream?cmd=ping+127.0.0.1&dump=true
-	example: https://127.0.0.1:8080/jobs/long/stream?cmd=top&timeout=10&dump=true
+	example: https://127.0.0.1:8080/worker/v1/jobs/long/stream/schedule?cmd=ping+127.0.0.1&dump=true
+	example: https://127.0.0.1:8080/worker/v1/jobs/long/stream/schedule?cmd=top&timeout=10&dump=true
 	```
 
 
-* To execute multiple long running remote task (optionally with timeout in mins) and use their ids to get their realtime outputs:
+* To execute multiple long running remote task (optionally with timeout in mins) and use their ids to stream their realtime outputs:
 	
 	```
-	https://<server-ip-address>:<port>/jobs/long/stream?cmd=<command+argument>&cmd=<command+argument>&timeout=<value>
+	https://<server-ip-address>:<port>/worker/v1/jobs/long/stream/schedule?cmd=<command+argument>&cmd=<command+argument>&timeout=<value>
 	```
 	
 	[+] On Windows Operating System.
 	```
-	example: https://127.0.0.1:8080/jobs/long/stream?cmd=ping+4.4.4.4+-t&cmd=ping+8.8.8.8+-t&timeout=30
-	example: https://127.0.0.1:8080/jobs/long/stream?cmd=netstat+-an+|+findstr+ESTAB&netstat+-an+|+findstr+ESTAB&timeout=15
+	example: https://127.0.0.1:8080/worker/v1/jobs/long/stream/schedule?cmd=ping+4.4.4.4+-t&cmd=ping+8.8.8.8+-t&timeout=30
+	example: https://127.0.0.1:8080/worker/v1/jobs/long/stream/schedule?cmd=netstat+-an+|+findstr+ESTAB&netstat+-an+|+findstr+ESTAB&timeout=15
 	```
 
 	[+] On Linux Operating System.
 	```
-	example: https://127.0.0.1:8080/jobs/long/stream?cmd=ping+4.4.4.4&cmd=ping+8.8.8.8&cmd=ping+1.1.1.1&timeout=30
-	example: https://127.0.0.1:8080/jobs/long/stream?cmd=&cmd=tail+-f/var/log/syslog&cmd=tail+-f+/var/log/messages&timeout=30
+	example: https://127.0.0.1:8080/worker/v1/jobs/long/stream/schedule?cmd=ping+4.4.4.4&cmd=ping+8.8.8.8&cmd=ping+1.1.1.1&timeout=30
+	example: https://127.0.0.1:8080/worker/v1/jobs/long/stream/schedule?cmd=&cmd=tail+-f/var/log/syslog&cmd=tail+-f+/var/log/messages&timeout=30
 	```
 
 
-* To submit one or more commands (jobs) for immediate execution and later retreive outputs:
+* To execute one or multiple short running jobs (optionally with timeout in seconds) and later use their ids to fetch their outputs:
 	
 	```
-	https://<server-ip-address>:<port>/jobs?cmd=<command+argument>&cmd=<command+argument>
+	https://<server-ip-address>:<port>/worker/v1/jobs/short/schedule?cmd=<command+argument>&cmd=<command+argument>&timeout=<value>
 	```
 
 	[+] On Windows Operating System.
 	```
-	example: https://127.0.0.1:8080/jobs?cmd=systeminfo&cmd=ipconfig+/all&cmd=tasklist
-	example: https://127.0.0.1:8080/jobs?cmd=ipconfig+/all
+	example: https://127.0.0.1:8080/worker/v1/jobs/short/schedule?cmd=systeminfo&cmd=ipconfig+/all&cmd=tasklist
+	example: https://127.0.0.1:8080/worker/v1/jobs/short/schedule?cmd=ipconfig+/all
 	```
 
 	[+] On Linux Operating System.
 	```
-	example: https://127.0.0.1:8080/jobs?cmd=ls+-la&cmd=ip+a&cmd=ps
+	example: https://127.0.0.1:8080/worker/v1/jobs/short/schedule?cmd=ls+-la&cmd=ip+a&cmd=ps
 	```
 
 
-* To check the detailed status of one or more submitted commands (jobs):
+* To check the detailed status of one or multiple submitted jobs:
 	
 	```
-	https://<server-ip-address>:<port>/jobs/status?id=<job-1-id>&id=<job-2-id>
+	https://<server-ip-address>:<port>/worker/v1/jobs/x/status/check?id=<job-1-id>&id=<job-2-id>
 	```
 
 	[+] On Windows or Linux Operating System.
 	```
-	example: https://127.0.0.1:8080/jobs/status?id=abe478954cef4125&id=cde478910cef4125
+	example: https://127.0.0.1:8080/worker/v1/jobs/x/status/check?id=abe478954cef4125&id=cde478910cef4125
 	```
 
 
-* To fetch the output of one command (job) submitted:
+* To check the status of all submitted jobs:
 	
 	```
-	https://<server-ip-address>:<port>/jobs/results?id=<job-id>
+	https://<server-ip-address>:<port>/worker/v1/jobs/x/stop/all?order=[asc|desc]
 	```
 
 	[+] On Windows or Linux Operating System.
 	```
-	example: https://127.0.0.1:8080/jobs/results?id=abe478954cef4125
+	example: https://127.0.0.1:8080/worker/v1/jobs/x/status/check/all
+	example: https://127.0.0.1:8080/worker/v1/jobs/x/status/check/all?order=asc
+	example: https://127.0.0.1:8080/worker/v1/jobs/x/status/check/all?order=desc
 	```
+	
 
-
-* To check the status of all submitted commands (jobs):
+* To fetch the output of a single short running job by its id:
 	
 	```
-	https://<server-ip-address>:<port>/jobs/status/?order=[asc|desc]
-	https://<server-ip-address>:<port>/jobs/stats/?order=[asc|desc]
+	https://<server-ip-address>:<port>/worker/v1/jobs/short/output/fetch?id=<job-id>
 	```
 
 	[+] On Windows or Linux Operating System.
 	```
-	example: https://127.0.0.1:8080/jobs/status/
-	example: https://127.0.0.1:8080/jobs/status/?order=asc
-	example: https://127.0.0.1:8080/jobs/stats/?order=desc
+	example: https://127.0.0.1:8080/worker/v1/jobs/short/output/fetch?id=abe478954cef4125
 	```
 
 
-* To stop of one or more submitted running commands (jobs):
+* To stop one or multiple submitted running jobs:
 	
 	```
-	https://<server-ip-address>:<port>/jobs/stop?id=<job-1-id>&id=<job-2-id>
+	https://<server-ip-address>:<port>/worker/v1/jobs/x/stop?id=<job-1-id>&id=<job-2-id>
 	```
 
 	[+] On Windows or Linux Operating System.
 	```
-	example: https://127.0.0.1:8080/jobs/stop?id=abe478954cef4125&id=cde478910cef4125
+	example: https://127.0.0.1:8080/worker/v1/jobs/x/stop?id=abe478954cef4125&id=cde478910cef4125
 	```
 
 	
-* To stop of all submitted running commands (jobs):
+* To stop of all (short and long) submitted running jobs:
 	
 	```
-	https://<server-ip-address>:<port>/jobs/stop/
+	https://<server-ip-address>:<port>/worker/v1/jobs/x/stop/all
 	```
 
 	[+] On Windows or Linux Operating System.
 	```
-	example: https://127.0.0.1:8080/jobs/stop/
+	example: https://127.0.0.1:8080/worker/v1/jobs/x/stop/all
 	```
 
-	
-* To restart one or more submitted commands (jobs):
+
+* To restart one or multiple submitted jobs:
 	
 	```
-	https://<server-ip-address>:<port>/jobs/restart?id=<job-1-id>&id=<job-2-id>
+	https://<server-ip-address>:<port>/worker/v1/jobs/x/restart?id=<job-1-id>&id=<job-2-id>
 	```
 
 	[+] On Windows or Linux Operating System.
 	```
-	example: https://127.0.0.1:8080/jobs/restart?id=abe478954cef4125&id=cde478910cef4125
+	example: https://127.0.0.1:8080/worker/v1/jobs/x/restart?id=abe478954cef4125&id=cde478910cef4125
 	```
 
 
-* To restart all submitted commands (jobs):
+* To restart all (only short running) submitted jobs:
 	
 	```
-	https://<server-ip-address>:<port>/jobs/restart/
+	https://<server-ip-address>:<port>/worker/v1/jobs/x/restart/all
 	```
 
 	[+] On Windows or Linux Operating System.
 	```
-	example: https://127.0.0.1:8080/jobs/restart/
+	example: https://127.0.0.1:8080/worker/v1/jobs/x/restart/all
 	```
 
 
@@ -291,12 +292,9 @@ $ docker run -d --publish 8080:8080 --name unix-worker --rm unix-worker /bin/sh 
 * add command line options on worker service to list or delete jobs or dump jobs output
 * add feature to move worker service into maintenance mode - stop accepting jobs
 * add URI & handler to schedule multiple long running jobs and stream their output to files
-* add for each job its memory buffer size and timeout value when displaying status / statistics
+* identify each web request with a unique id for further tracing using middleware & http context
 * limit the overall number of jobs scheduling to 10K and make it dynamically configurable
 * embed websocket html/JS template file into executable by leveraging golang 1.16 feature
-* do not restart long running jobs when user request to restart all jobs
-* into background deletion service, only stop running job
-* rename short running jobs URI & handler to /jobs/short?cmd=x and scheduleShortRunningJobs
 
 
 
