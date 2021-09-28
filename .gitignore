@@ -16,3 +16,6 @@
 
 # Ignore the server certificate folder
 certs
+
+# Ignore the jobs outputs files folder
+outputs
