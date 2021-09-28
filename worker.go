@@ -104,7 +104,7 @@ type Job struct {
 	isstreaming bool          // if stream already being consumed over a websocket.
 	lock        *sync.RWMutex // job level mutex for access synchronization.
 	result      *bytes.Buffer // in memory buffer to store output.
-	file        *os.File      // disk file where to stream long job output.
+	filename    string        // filename where to dump long running job output.
 	dump        bool          // if true then save output to disk file.
 	submittime  time.Time     // datetime job was submitted.
 	starttime   time.Time     // datetime job was started.
@@ -375,13 +375,13 @@ func executeJob(job *Job, ctx context.Context) {
 			jobslog.Printf("[%s] [%05d] error occured during the scheduling of the job - errmsg: %v\n", job.id, job.pid, err)
 			job.issuccess = false
 			job.errormsg = err.Error()
+			return
 		}
 	} else if job.islong && job.dump {
 		// long running job and user requested to save output to disk file.
-		// construct the filename based on job id and submitted time.
-		filename := fmt.Sprintf("%s%s%s-%s%s%s", job.submittime.Year(), job.submittime.Month(), job.submittime.Day(), job.submittime.Hour(), job.submittime.Minute(), job.submittime.Second())
-		job.file, err = os.OpenFile(fmt.Sprintf("%s.%s.txt", job.id, filename), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
-		defer (job.file).Close()
+		// construct the filename based on job submitted time and its id.
+		job.filename = fmt.Sprintf("%02d%02d%02d.%s.txt", job.submittime.Year(), job.submittime.Month(), job.submittime.Day(), job.id)
+		file, err := os.OpenFile(job.filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
 		if err != nil {
 			// cannot satisfy the output dumping so abort the process.
 			jobslog.Printf("[%s] [%05d] failed to create or open saving file for the job - errmsg: %v\n", job.id, job.pid, err)
@@ -392,6 +392,7 @@ func executeJob(job *Job, ctx context.Context) {
 			job.errormsg = err.Error()
 			return
 		}
+		defer file.Close()
 		// duplicate the output stream for streaming to the disk file and keep the second for user streaming.
 		outpipe, err := cmd.StdoutPipe()
 		if err != nil {
@@ -401,8 +402,9 @@ func executeJob(job *Job, ctx context.Context) {
 			jobslog.Printf("[%s] [%05d] error occured during the scheduling of the job - errmsg: %v\n", job.id, job.pid, err)
 			job.issuccess = false
 			job.errormsg = err.Error()
+			return
 		}
-		job.outstream = io.TeeReader(outpipe, job.file)
+		job.outstream = io.TeeReader(outpipe, file)
 	} else {
 		// short running job so set the output to result memory buffer.
 		cmd.Stdout = job.result
@@ -472,8 +474,8 @@ func executeJob(job *Job, ctx context.Context) {
 		break
 	}
 
-	job.endtime = time.Now().UTC()
 	job.iscompleted = true
+	job.endtime = time.Now().UTC()
 
 	if err != nil {
 		// timeout not reached - but an error occured during execution
@@ -876,6 +878,23 @@ func truncateSyntax(syntax string, maxlength int) string {
 	return syntax
 }
 
+// formatSize takes the size of a bytes buffer or file in float64 and converts to KB
+// then formats it with 0 - 4 digits after the point depending of the value.
+func formatSize(size float64) string {
+	size = size / 1024
+	if size < 10.0 {
+		return fmt.Sprintf("%.4f", size)
+	} else if size < 100.0 {
+		return fmt.Sprintf("%.3f", size)
+	} else if size < 1000.0 {
+		return fmt.Sprintf("%.2f", size)
+	} else if size < 10000.0 {
+		return fmt.Sprintf("%.1f", size)
+	} else {
+		return fmt.Sprintf("%.0f", size)
+	}
+}
+
 // checkJobsStatusById tells us if one or multiple submitted jobs are either in progress
 // or terminated or do not exist. triggered for following request : /jobs/status?id=xx&id=xx
 func checkJobsStatusById(w http.ResponseWriter, r *http.Request) {
@@ -915,7 +934,6 @@ func checkJobsStatusById(w http.ResponseWriter, r *http.Request) {
 	}
 	// retreive each job status and send.
 	i := 0
-	var size float64
 	var errorsMessages string
 	var start, end, sizeFormat string
 	mapLock.RLock()
@@ -943,24 +961,20 @@ func checkJobsStatusById(w http.ResponseWriter, r *http.Request) {
 			end = (job.endtime).Format("2006-01-02 15:04:05")
 		}
 
-		if job.islong {
-			// long running job does not buffer the output to memory.
-			sizeFormat = "N/A"
-		} else {
-			// compute the size of the buffer in KB and format it with
-			// 0 - 4 digits after the point depending of the value.
-			size = float64(job.result.Len()) / 1024
-			if size < 10.0 {
-				sizeFormat = fmt.Sprintf("%.4f", size)
-			} else if size < 100.0 {
-				sizeFormat = fmt.Sprintf("%.3f", size)
-			} else if size < 1000.0 {
-				sizeFormat = fmt.Sprintf("%.2f", size)	
-			} else if size < 10000.0 {
-				sizeFormat = fmt.Sprintf("%.1f", size)
+		if !job.islong {
+			// short job, get memory buffer length.
+			sizeFormat = formatSize(float64(job.result.Len()))
+		} else if job.islong && job.dump {
+			// long job with dumping to file option, use file size.
+			fi, err := os.Stat(job.filename)
+			if err == nil {
+				sizeFormat = formatSize(float64(fi.Size()))
 			} else {
-				sizeFormat = fmt.Sprintf("%.0f", size)
+				sizeFormat = "N/A"
 			}
+		} else {
+			// long job with dump option.
+			sizeFormat = "N/A"
 		}
 		// stream the added job details to user/client.
 		fmt.Fprintln(w, fmt.Sprintf("|%04d | %-16s | %05d | %-5v | %-5v | %-7v | %-9d | %-9s | %-5d | %-5d | %-5d | %-7d | %-20v | %-20v | %-20v | %-30s |", i, job.id, job.pid, job.islong, job.iscompleted, job.issuccess, job.exitcode, sizeFormat, job.fetchcount, job.memlimit, job.cpulimit, job.timeout, (job.submittime).Format("2006-01-02 15:04:05"), start, end, truncateSyntax(job.task, 30)))
@@ -1045,7 +1059,6 @@ func getAllJobsStatus(w http.ResponseWriter, r *http.Request) {
 
 	// loop over slice of jobs and send each job's status.
 	i := 0
-	var size float64
 	var start, end, sizeFormat string
 	for _, job := range jobs {
 		i += 1
@@ -1062,24 +1075,20 @@ func getAllJobsStatus(w http.ResponseWriter, r *http.Request) {
 			end = (job.endtime).Format("2006-01-02 15:04:05")
 		}
 
-		if job.islong {
-			// long running job does not buffer the output to memory.
-			sizeFormat = "N/A"
-		} else {
-			// compute the size of the buffer in KB and format it with
-			// 0 - 4 digits after the point depending of the value.
-			size = float64(job.result.Len()) / 1024
-			if size < 10.0 {
-				sizeFormat = fmt.Sprintf("%.4f", size)
-			} else if size < 100.0 {
-				sizeFormat = fmt.Sprintf("%.3f", size)
-			} else if size < 1000.0 {
-				sizeFormat = fmt.Sprintf("%.2f", size)	
-			} else if size < 10000.0 {
-				sizeFormat = fmt.Sprintf("%.1f", size)
+		if !job.islong {
+			// short job, get memory buffer length.
+			sizeFormat = formatSize(float64(job.result.Len()))
+		} else if job.islong && job.dump {
+			// long job with dumping to file option, use file size.
+			fi, err := os.Stat(job.filename)
+			if err == nil {
+				sizeFormat = formatSize(float64(fi.Size()))
 			} else {
-				sizeFormat = fmt.Sprintf("%.0f", size)
+				sizeFormat = "N/A"
 			}
+		} else {
+			// long job with dump option.
+			sizeFormat = "N/A"
 		}
 		// stream the added job details to user/client.
 		fmt.Fprintln(w, fmt.Sprintf("|%04d | %-16s | %05d | %-5v | %-5v | %-7v | %-9d | %-9s | %-5d | %-5d | %-5d | %-7d | %-20v | %-20v | %-20v | %-30s |", i, job.id, job.pid, job.islong, job.iscompleted, job.issuccess, job.exitcode, sizeFormat, job.fetchcount, job.memlimit, job.cpulimit, job.timeout, (job.submittime).Format("2006-01-02 15:04:05"), start, end, truncateSyntax(job.task, 30)))
