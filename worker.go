@@ -906,17 +906,18 @@ func checkJobsStatusById(w http.ResponseWriter, r *http.Request) {
 		f.Flush()
 	}
 	// format the display table.
-	title := fmt.Sprintf("|%-4s | %-16s | %-5s | %-5s | %-5s | %-7s | %-9s | %-10s | %-5s | %-5s | %-7s | %-20s | %-20s | %-20s | %-30s |", "Nb", "Job ID", "PID", "Long", "Done", "Success", "Exit Code", "Count", "Mem", "CPU%", "Timeout", "Submitted At [UTC]", "Started At [UTC]", "Ended At [UTC]", "Command Syntax")
+	title := fmt.Sprintf("|%-4s | %-16s | %-5s | %-5s | %-5s | %-7s | %-9s | %-9s | %-5s | %-5s | %-5s | %-7s | %-20s | %-20s | %-20s | %-30s |", "Nb", "Job ID", "PID", "Long", "Done", "Success", "Exit Code", "Data [KB]", "Count", "Mem", "CPU%", "Timeout", "Submitted At [UTC]", "Started At [UTC]", "Ended At [UTC]", "Command Syntax")
 	fmt.Fprintln(w, strings.Repeat("=", len(title)))
 	fmt.Fprintln(w, title)
-	fmt.Fprintf(w, fmt.Sprintf("+%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+\n", Dashs(4), Dashs(16), Dashs(5), Dashs(5), Dashs(5), Dashs(7), Dashs(9), Dashs(10), Dashs(5), Dashs(5), Dashs(7), Dashs(20), Dashs(20), Dashs(20), Dashs(30)))
+	fmt.Fprintf(w, fmt.Sprintf("+%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+\n", Dashs(4), Dashs(16), Dashs(5), Dashs(5), Dashs(5), Dashs(7), Dashs(9), Dashs(9), Dashs(5), Dashs(5), Dashs(5), Dashs(7), Dashs(20), Dashs(20), Dashs(20), Dashs(30)))
 	if ok {
 		f.Flush()
 	}
 	// retreive each job status and send.
 	i := 0
+	var size float64
 	var errorsMessages string
-	var start, end string
+	var start, end, sizeFormat string
 	mapLock.RLock()
 	for _, id := range ids {
 
@@ -941,9 +942,29 @@ func checkJobsStatusById(w http.ResponseWriter, r *http.Request) {
 		} else {
 			end = (job.endtime).Format("2006-01-02 15:04:05")
 		}
+
+		if job.islong {
+			// long running job does not buffer the output to memory.
+			sizeFormat = "N/A"
+		} else {
+			// compute the size of the buffer in KB and format it with
+			// 0 - 4 digits after the point depending of the value.
+			size = float64(job.result.Len()) / 1024
+			if size < 10.0 {
+				sizeFormat = fmt.Sprintf("%.4f", size)
+			} else if size < 100.0 {
+				sizeFormat = fmt.Sprintf("%.3f", size)
+			} else if size < 1000.0 {
+				sizeFormat = fmt.Sprintf("%.2f", size)	
+			} else if size < 10000.0 {
+				sizeFormat = fmt.Sprintf("%.1f", size)
+			} else {
+				sizeFormat = fmt.Sprintf("%.0f", size)
+			}
+		}
 		// stream the added job details to user/client.
-		fmt.Fprintln(w, fmt.Sprintf("|%04d | %-16s | %05d | %-5v | %-5v | %-7v | %-9d | %-10d | %-5d | %-5d | %-7d | %-20v | %-20v | %-20v | %-30s |", i, job.id, job.pid, job.islong, job.iscompleted, job.issuccess, job.exitcode, job.fetchcount, job.memlimit, job.cpulimit, job.timeout, (job.submittime).Format("2006-01-02 15:04:05"), start, end, truncateSyntax(job.task, 30)))
-		fmt.Fprintf(w, fmt.Sprintf("+%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+\n", Dashs(4), Dashs(16), Dashs(5), Dashs(5), Dashs(5), Dashs(7), Dashs(9), Dashs(10), Dashs(5), Dashs(5), Dashs(7), Dashs(20), Dashs(20), Dashs(20), Dashs(30)))
+		fmt.Fprintln(w, fmt.Sprintf("|%04d | %-16s | %05d | %-5v | %-5v | %-7v | %-9d | %-9s | %-5d | %-5d | %-5d | %-7d | %-20v | %-20v | %-20v | %-30s |", i, job.id, job.pid, job.islong, job.iscompleted, job.issuccess, job.exitcode, sizeFormat, job.fetchcount, job.memlimit, job.cpulimit, job.timeout, (job.submittime).Format("2006-01-02 15:04:05"), start, end, truncateSyntax(job.task, 30)))
+		fmt.Fprintf(w, fmt.Sprintf("+%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+\n", Dashs(4), Dashs(16), Dashs(5), Dashs(5), Dashs(5), Dashs(7), Dashs(9), Dashs(9), Dashs(5), Dashs(5), Dashs(5), Dashs(7), Dashs(20), Dashs(20), Dashs(20), Dashs(30)))
 		if ok {
 			f.Flush()
 		}
@@ -976,10 +997,10 @@ func getAllJobsStatus(w http.ResponseWriter, r *http.Request) {
 		f.Flush()
 	}
 	// format the display table.
-	title := fmt.Sprintf("|%-4s | %-16s | %-5s | %-5s | %-5s | %-7s | %-9s | %-10s | %-5s | %-5s | %-7s | %-20s | %-20s | %-20s | %-30s |", "Nb", "Job ID", "PID", "Long", "Done", "Success", "Exit Code", "Count", "Mem", "CPU%", "Timeout", "Submitted At [UTC]", "Started At [UTC]", "Ended At [UTC]", "Command Syntax")
+	title := fmt.Sprintf("|%-4s | %-16s | %-5s | %-5s | %-5s | %-7s | %-9s | %-9s | %-5s | %-5s | %-5s | %-7s | %-20s | %-20s | %-20s | %-30s |", "Nb", "Job ID", "PID", "Long", "Done", "Success", "Exit Code", "Data [KB]", "Count", "Mem", "CPU%", "Timeout", "Submitted At [UTC]", "Started At [UTC]", "Ended At [UTC]", "Command Syntax")
 	fmt.Fprintln(w, strings.Repeat("=", len(title)))
 	fmt.Fprintln(w, title)
-	fmt.Fprintf(w, fmt.Sprintf("+%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+\n", Dashs(4), Dashs(16), Dashs(5), Dashs(5), Dashs(5), Dashs(7), Dashs(9), Dashs(10), Dashs(5), Dashs(5), Dashs(7), Dashs(20), Dashs(20), Dashs(20), Dashs(30)))
+	fmt.Fprintf(w, fmt.Sprintf("+%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+\n", Dashs(4), Dashs(16), Dashs(5), Dashs(5), Dashs(5), Dashs(7), Dashs(9), Dashs(9), Dashs(5), Dashs(5), Dashs(5), Dashs(7), Dashs(20), Dashs(20), Dashs(20), Dashs(30)))
 	if ok {
 		f.Flush()
 	}
@@ -1024,7 +1045,8 @@ func getAllJobsStatus(w http.ResponseWriter, r *http.Request) {
 
 	// loop over slice of jobs and send each job's status.
 	i := 0
-	var start, end string
+	var size float64
+	var start, end, sizeFormat string
 	for _, job := range jobs {
 		i += 1
 		// format time display for zero time values.
@@ -1040,9 +1062,28 @@ func getAllJobsStatus(w http.ResponseWriter, r *http.Request) {
 			end = (job.endtime).Format("2006-01-02 15:04:05")
 		}
 
+		if job.islong {
+			// long running job does not buffer the output to memory.
+			sizeFormat = "N/A"
+		} else {
+			// compute the size of the buffer in KB and format it with
+			// 0 - 4 digits after the point depending of the value.
+			size = float64(job.result.Len()) / 1024
+			if size < 10.0 {
+				sizeFormat = fmt.Sprintf("%.4f", size)
+			} else if size < 100.0 {
+				sizeFormat = fmt.Sprintf("%.3f", size)
+			} else if size < 1000.0 {
+				sizeFormat = fmt.Sprintf("%.2f", size)	
+			} else if size < 10000.0 {
+				sizeFormat = fmt.Sprintf("%.1f", size)
+			} else {
+				sizeFormat = fmt.Sprintf("%.0f", size)
+			}
+		}
 		// stream the added job details to user/client.
-		fmt.Fprintln(w, fmt.Sprintf("|%04d | %-16s | %05d | %-5v | %-5v | %-7v | %-9d | %-10d | %-5d | %-5d | %-7d | %-20v | %-20v | %-20v | %-30s |", i, job.id, job.pid, job.islong, job.iscompleted, job.issuccess, job.exitcode, job.fetchcount, job.memlimit, job.cpulimit, job.timeout, (job.submittime).Format("2006-01-02 15:04:05"), start, end, truncateSyntax(job.task, 30)))
-		fmt.Fprintf(w, fmt.Sprintf("+%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+\n", Dashs(4), Dashs(16), Dashs(5), Dashs(5), Dashs(5), Dashs(7), Dashs(9), Dashs(10), Dashs(5), Dashs(5), Dashs(7), Dashs(20), Dashs(20), Dashs(20), Dashs(30)))
+		fmt.Fprintln(w, fmt.Sprintf("|%04d | %-16s | %05d | %-5v | %-5v | %-7v | %-9d | %-9s | %-5d | %-5d | %-5d | %-7d | %-20v | %-20v | %-20v | %-30s |", i, job.id, job.pid, job.islong, job.iscompleted, job.issuccess, job.exitcode, sizeFormat, job.fetchcount, job.memlimit, job.cpulimit, job.timeout, (job.submittime).Format("2006-01-02 15:04:05"), start, end, truncateSyntax(job.task, 30)))
+		fmt.Fprintf(w, fmt.Sprintf("+%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+\n", Dashs(4), Dashs(16), Dashs(5), Dashs(5), Dashs(5), Dashs(7), Dashs(9), Dashs(9), Dashs(5), Dashs(5), Dashs(5), Dashs(7), Dashs(20), Dashs(20), Dashs(20), Dashs(30)))
 		if ok {
 			f.Flush()
 		}
