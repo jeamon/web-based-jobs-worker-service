@@ -56,8 +56,8 @@ func isWebsocketRequest(req *http.Request) bool {
 	return connectionUpgradeRegex.MatchString(strings.ToLower(req.Header.Get("Connection"))) && strings.ToLower(req.Header.Get("Upgrade")) == "websocket"
 }
 
-// streamJobsResultsById streams the result output for a given running job.
-func streamJobsResultsById(w http.ResponseWriter, r *http.Request) {
+// streamJobsOutputById streams the result output for a given running job.
+func streamJobsOutputById(w http.ResponseWriter, r *http.Request) {
 	if isWebsocketRequest(r) {
 		// websocket connection to stream the output.
 		// upgrade to a WebSocket connection.
@@ -149,13 +149,13 @@ func streamJob(ws *websocket.Conn, id string) {
 				return
 			} else if job.iscompleted == false {
 				// error happened during stream reading. close this streaming session.
-				jobslog.Printf("[%s] [%05d] error when reading output stream of the job\n", id, job.pid)
+				jobslog.Printf("[%s] [%05d] error when reading output stream of the job - errmsg: %v\n", id, job.pid, err)
 				ws.WriteMessage(websocket.TextMessage, []byte("\n\nOoops, error occured on server side. Job still running. Retry the streaming."))
 				return
 			} else {
 				// unexpected error - must be reported for investigation.
 				// error happened during stream reading. close this streaming session.
-				jobslog.Printf("[%s] [%05d] unexpected error when reading output stream of the job\n", id, job.pid)
+				jobslog.Printf("[%s] [%05d] unexpected error when reading output stream of the job - errmsg: %v\n", id, job.pid, err)
 				ws.WriteMessage(websocket.TextMessage, []byte("\n\nOoops, unexpected error occured on server side. Retry the streaming or Report to admin for investigation."))
 				return
 			}
@@ -250,10 +250,10 @@ func scheduleLongJobsWithStreaming(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("\n[+] find below some details of the jobs submitted\n\n"))
 
 	// format the display table.
-	title := fmt.Sprintf("|%-4s | %-18s | %-14s | %-10s | %-7s | %-38s | %-30s |", "Nb", "Job ID", "Memory [MB]", "CPU [%]", "Timeout", "Submitted At [UTC]", "Command Syntax")
+	title := fmt.Sprintf("|%-4s | %-18s | %-14s | %-10s | %-7s | %-20s | %-30s |", "Nb", "Job ID", "Memory [MB]", "CPU [%]", "Timeout", "Submitted At [UTC]", "Command Syntax")
 	fmt.Fprintln(w, strings.Repeat("=", len(title)))
 	fmt.Fprintln(w, title)
-	fmt.Fprintf(w, fmt.Sprintf("+%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+\n", Dashs(4), Dashs(18), Dashs(14), Dashs(10), Dashs(7), Dashs(38), Dashs(30)))
+	fmt.Fprintf(w, fmt.Sprintf("+%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+\n", Dashs(4), Dashs(18), Dashs(14), Dashs(10), Dashs(7), Dashs(20), Dashs(30)))
 	if ok {
 		f.Flush()
 	}
@@ -263,7 +263,7 @@ func scheduleLongJobsWithStreaming(w http.ResponseWriter, r *http.Request) {
 			id:          generateID(),
 			pid:         0,
 			task:        cmd,
-			islong:      false,
+			islong:      true,
 			iscompleted: false,
 			issuccess:   false,
 			exitcode:    -1,
@@ -289,8 +289,8 @@ func scheduleLongJobsWithStreaming(w http.ResponseWriter, r *http.Request) {
 		globalJobsQueue <- job
 		jobslog.Printf("[%s] [%05d] scheduled the processing of the job\n", job.id, job.pid)
 		// stream the added job details to user/client.
-		fmt.Fprintln(w, fmt.Sprintf("|%04d | %-18s | %-14d | %-10d | %-7d | %-38v | %-30s |", i+1, job.id, job.memlimit, job.cpulimit, job.timeout, (job.submittime).Format("2006-01-02 15:04:05"), truncateSyntax(job.task, 30)))
-		fmt.Fprintf(w, fmt.Sprintf("+%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+\n", Dashs(4), Dashs(18), Dashs(14), Dashs(10), Dashs(7), Dashs(38), Dashs(30)))
+		fmt.Fprintln(w, fmt.Sprintf("|%04d | %-18s | %-14d | %-10d | %-7d | %-20v | %-30s |", i+1, job.id, job.memlimit, job.cpulimit, job.timeout, (job.submittime).Format("2006-01-02 15:04:05"), truncateSyntax(job.task, 30)))
+		fmt.Fprintf(w, fmt.Sprintf("+%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+\n", Dashs(4), Dashs(18), Dashs(14), Dashs(10), Dashs(7), Dashs(20), Dashs(30)))
 		if ok {
 			f.Flush()
 		}

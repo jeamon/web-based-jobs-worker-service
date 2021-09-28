@@ -103,7 +103,7 @@ type Job struct {
 	outstream   io.Reader     // makes available output for streaming.
 	isstreaming bool          // if stream already being consumed over a websocket.
 	lock        *sync.RWMutex // job level mutex for access synchronization.
-	result      *bytes.Buffer // in memory buffer to store output.
+	result      *bytes.Buffer // in-memory buffer to save output - getJobsOutputById().
 	filename    string        // filename where to dump long running job output.
 	dump        bool          // if true then save output to disk file.
 	submittime  time.Time     // datetime job was submitted.
@@ -737,7 +737,7 @@ func restartJobsById(w http.ResponseWriter, r *http.Request) {
 	if !exist || len(ids) == 0 {
 		// request does not contains query string id.
 		w.WriteHeader(400)
-		w.Write([]byte("\n[+] Hello • The request sent is malformed • The expected format is :\n https://server-ip:8080/jobs/restart?id=xx&id=xx\n"))
+		w.Write([]byte("\n[+] Sorry, the request sent is malformed. Please check details at https://server-ip:8080/"))
 		return
 	}
 
@@ -804,7 +804,7 @@ func restartJobsById(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// restartAllJobs triggers termination of all running jobs and immediate start of all completed jobs.
+// restartAllJobs triggers termination of all short running jobs and immediate start of all completed short jobs.
 func restartAllJobs(w http.ResponseWriter, r *http.Request) {
 	// try to setup the response as not buffered data. if succeeds it will be used to flush.
 	f, ok := w.(http.Flusher)
@@ -907,7 +907,7 @@ func checkJobsStatusById(w http.ResponseWriter, r *http.Request) {
 	if !exist || len(ids) == 0 {
 		// request does not contains query string id.
 		w.WriteHeader(400)
-		w.Write([]byte("\n[+] Hello • The request sent is malformed • The expected format is :\n https://server-ip:8080/jobs/status?id=xx&id=xx\n"))
+		w.Write([]byte("\n[+] Sorry, the request sent is malformed. Please check details at https://server-ip:8080/"))
 		return
 	}
 
@@ -1099,8 +1099,8 @@ func getAllJobsStatus(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// getJobsResultsById retreive result output for a given (*job).
-func getJobsResultsById(w http.ResponseWriter, r *http.Request) {
+// getJobsOutputById retreive result output for a given (*job).
+func getJobsOutputById(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf8")
 
 	// expect one value for the query - if multiple passed only first will be returned.
@@ -1608,34 +1608,32 @@ func startWebServer(exit <-chan struct{}) error {
 	router := http.NewServeMux()
 	// default request - list how to details.
 	router.HandleFunc("/", webHelp)
-	// expected request : /execute?cmd=<task-syntax>&timeout=<value>
-	router.HandleFunc("/execute", instantCommandExecutor)
-	// expected request : jobs/short?cmd=<task-syntax>
-	router.HandleFunc("/jobs", scheduleShortRunningJobs)
-	// expected request : /jobs/status?id=<jobid>
-	router.HandleFunc("/jobs/status", checkJobsStatusById)
-	// expected format : /jobs/results?id=<jobid>
-	router.HandleFunc("/jobs/results", getJobsResultsById)
-	// expected request : /jobs/status/?order=asc|desc or /jobs/stats/?order=asc|desc
-	router.HandleFunc("/jobs/status/", getAllJobsStatus)
-	router.HandleFunc("/jobs/stats/", getAllJobsStatus)
-	// expected request : /jobs/stop?id=<jobid>&id=<jobid>
-	router.HandleFunc("/jobs/stop", stopJobsById)
-	// expected request : /jobs/stop/
-	router.HandleFunc("/jobs/stop/", stopAllJobs)
-	// expected request : /jobs/restart?id=<jobid>&id=<jobid>
-	router.HandleFunc("/jobs/restart", restartJobsById)
-	// expected request : /jobs/restart/
-	router.HandleFunc("/jobs/restart/", restartAllJobs)
-
-	// live streaming a long running job output: /jobs/results/stream?id=<jobid>
-	router.HandleFunc("/jobs/results/stream", streamJobsResultsById)
+	// expected request : /worker/v1/cmd/execute?cmd=<task-syntax>&timeout=<value>
+	router.HandleFunc("/worker/v1/cmd/execute", instantCommandExecutor)
+	// expected request : /worker/v1/jobs/short/schedule?cmd=<task-syntax>
+	router.HandleFunc("/worker/v1/jobs/short/schedule", scheduleShortRunningJobs)
+	// expected request : /worker/v1/jobs/x/status/check?id=<jobid>
+	router.HandleFunc("/worker/v1/jobs/x/status/check", checkJobsStatusById)
+	// expected format : /worker/v1/jobs/short/output/fetch?id=<jobid>
+	router.HandleFunc("/worker/v1/jobs/short/output/fetch", getJobsOutputById)
+	// expected request : /worker/v1/jobs/x/status/check/all?order=asc|desc
+	router.HandleFunc("/worker/v1/jobs/x/status/check/all", getAllJobsStatus)
+	// expected request : /worker/v1/jobs/x/stop?id=<jobid>&id=<jobid>
+	router.HandleFunc("/worker/v1/jobs/x/stop", stopJobsById)
+	// expected request : /worker/v1/jobs/x/stop/all
+	router.HandleFunc("/worker/v1/jobs/x/stop/all", stopAllJobs)
+	// expected request : /worker/v1/jobs/x/restart?id=<jobid>&id=<jobid>
+	router.HandleFunc("/worker/v1/jobs/x/restart", restartJobsById)
+	// expected request : /worker/v1/jobs/x/restart/all
+	router.HandleFunc("/worker/v1/jobs/x/restart/all", restartAllJobs)
+	// live streaming a long running job output: /worker/v1/jobs/long/output/stream?id=<jobid>
+	router.HandleFunc("/worker/v1/jobs/long/output/stream", streamJobsOutputById)
 	// schedule a long running job with output streaming capability.
-	// /jobs/long/stream?cmd=<task>&cmd=<task>&timeout=<value>&save=true|false
-	router.HandleFunc("/jobs/long/stream", scheduleLongJobsWithStreaming)
+	// /worker/v1/jobs/long/stream/schedule?cmd=<task>&cmd=<task>&timeout=<value>&save=true|false
+	router.HandleFunc("/worker/v1/jobs/long/stream/schedule", scheduleLongJobsWithStreaming)
 	// schedule a long running job with only streaming output to disk file.
-	// /jobs/long/dump?cmd=<task>&cmd=<task>&timeout=<value>
-	// router.HandleFunc("/jobs/long/dump", scheduleLongJobsWithDumping)
+	// /worker/v1/jobs/long/dump/schedule?cmd=<task>&cmd=<task>&timeout=<value>
+	// router.HandleFunc("/worker/v1/jobs/long/dump/schedule", scheduleLongJobsWithDumping)
 
 	webserver := &http.Server{
 		Addr:         address,
