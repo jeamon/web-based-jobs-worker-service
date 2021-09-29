@@ -1,6 +1,6 @@
 package main
 
-const version = "This tool is <jobs-worker-service> • version 1.0 By Jerome AMON"
+const version = " <jobs-worker-service> • version 1.0 By Jerome AMON"
 
 const help = `
 
@@ -24,11 +24,8 @@ const help = `
 
 	----------------------------------------------------------------------------------------------
 
-	[+] Hello - Please find below how to use use this web service.
 
-	----------------------------------------------------------------------------------------------
-
-	[*] Find below command line options dedicated to the worker service :
+	[0] Find below command line options dedicated to the worker service :
 
 	[+] On Windows Operating System.
 	worker.exe [ start | stop | restart | status | help | version]
@@ -36,100 +33,128 @@ const help = `
 	[+] On Linux Operating System.
 	./worker [ start | stop | restart | status | help | version]
 
-	----------------------------------------------------------------------------------------------
+	----------
 	
-	[1] To execute a remote command and get instantly the output (replace space with + sign):
+	[1] Execute a quick remote command (optionally with timeout in secs) and get the realtime output:
 	
-	https://<server-ip-address>:<port>/execute?cmd=<command+argument>
+	https://<server-ip-address>:<port>/worker/v1/cmd/execute?cmd=<command+argument>
 	
 	[+] On Windows Operating System.
-	example: https://127.0.0.1:8080/execute?cmd=systeminfo
-	example: https://127.0.0.1:8080/execute?cmd=ipconfig+/all
-	example: https://127.0.0.1:8080/execute?cmd=netstat+-an+|+findstr+ESTAB
+	example: https://127.0.0.1:8080/worker/v1/cmd/execute?cmd=systeminfo
+	example: https://127.0.0.1:8080/worker/v1/cmd/execute?cmd=ipconfig+/all
+	example: https://127.0.0.1:8080/worker/v1/cmd/execute?cmd=netstat+-an+|+findstr+ESTAB&timeout=45
 
 	[+] On Linux Operating System.
-	example: https://127.0.0.1:8080/execute?cmd=ls+-la
-	example: https://127.0.0.1:8080/execute?cmd=ip+a
-	example: https://127.0.0.1:8080/execute?cmd=ps
+	example: https://127.0.0.1:8080/worker/v1/cmd/execute?cmd=ls+-la
+	example: https://127.0.0.1:8080/worker/v1/cmd/execute?cmd=ip+a
+	example: https://127.0.0.1:8080/worker/v1/cmd/execute?cmd=ps
 
-	----------------------------------------------------------------------------------------------
+	----------
 
-	[2] To submit one or more commands (jobs) for immediate execution and later retreive outputs:
+	[2] Execute a long running remote job (with timeout in mins and dumping to file) and stream its output:
 	
-	https://<server-ip-address>:<port>/jobs?cmd=<command+argument>&cmd=<command+argument>
+	https://<server-ip-address>:<port>/worker/v1/jobs/long/stream/schedule?cmd=<command+argument>&timeout=<value>&dump=<true|false>
 
 	[+] On Windows Operating System.
-	example: https://127.0.0.1:8080/jobs?cmd=systeminfo&cmd=ipconfig+/all&cmd=tasklist
-	example: https://127.0.0.1:8080/jobs?cmd=ipconfig+/all
+	example: https://127.0.0.1:8080/worker/v1/jobs/long/stream/schedule?cmd=ping+127.0.0.1+-t&dump=true
+	example: https://127.0.0.1:8080/worker/v1/jobs/long/stream/schedule?cmd=netstat+-an+|+findstr+ESTAB&timeout=60
 
 	[+] On Linux Operating System.
-	example: https://127.0.0.1:8080/jobs?cmd=ls+-la&cmd=ip+a&cmd=ps
+	example: https://127.0.0.1:8080/worker/v1/jobs/long/stream/schedule?cmd=ping+127.0.0.1&dump=true
+	example: https://127.0.0.1:8080/worker/v1/jobs/long/stream/schedule?cmd=top&timeout=10&dump=true
 
-	----------------------------------------------------------------------------------------------
+	----------
 
-	[3] To check the detailed status of one or more submitted commands (jobs):
+	[3] Execute multiple long running remote jobs (with timeout in mins) and use their ids to stream their realtime outputs:
 	
-	https://<server-ip-address>:<port>/jobs/status?id=<job-1-id>&id=<job-2-id>
+	https://<server-ip-address>:<port>/worker/v1/jobs/long/stream/schedule?cmd=<command+argument>&cmd=<command+argument>&timeout=<value>
+
+	[+] On Windows Operating System.
+	example: https://127.0.0.1:8080/worker/v1/jobs/long/stream/schedule?cmd=ping+4.4.4.4+-t&cmd=ping+8.8.8.8+-t&timeout=30
+	example: https://127.0.0.1:8080/worker/v1/jobs/long/stream/schedule?cmd=netstat+-an+|+findstr+ESTAB&netstat+-an+|+findstr+ESTAB&timeout=15
+
+	[+] On Linux Operating System.
+	example: https://127.0.0.1:8080/worker/v1/jobs/long/stream/schedule?cmd=ping+4.4.4.4&cmd=ping+8.8.8.8&cmd=ping+1.1.1.1&timeout=30
+	example: https://127.0.0.1:8080/worker/v1/jobs/long/stream/schedule?cmd=&cmd=tail+-f/var/log/syslog&cmd=tail+-f+/var/log/messages&timeout=30
+	
+	----------
+
+	[4] Execute one or multiple short running jobs (optionally with timeout in seconds) and later use their ids to fetch their outputs:
+	
+	https://<server-ip-address>:<port>/worker/v1/jobs/short/schedule?cmd=<command+argument>&cmd=<command+argument>&timeout=<value>
+
+	[+] On Windows Operating System.
+	example: https://127.0.0.1:8080/worker/v1/jobs/short/schedule?cmd=systeminfo&cmd=ipconfig+/all&cmd=tasklist
+	example: https://127.0.0.1:8080/worker/v1/jobs/short/schedule?cmd=ipconfig+/all
+
+	[+] On Linux Operating System.
+	example: https://127.0.0.1:8080/worker/v1/jobs/short/schedule?cmd=ls+-la&cmd=ip+a&cmd=ps
+
+	----------
+
+	[5] To check the detailed status of one or multiple submitted jobs:
+	
+	https://<server-ip-address>:<port>/worker/v1/jobs/x/status/check?id=<job-1-id>&id=<job-2-id>
 
 	[+] On Windows or Linux Operating System.
-	example: https://127.0.0.1:8080/jobs/status?id=abe478954cef4125&id=cde478910cef4125
+	example: https://127.0.0.1:8080/worker/v1/jobs/x/status/check?id=abe478954cef4125&id=cde478910cef4125
 
-	----------------------------------------------------------------------------------------------
+	----------
 
-	[4] To fetch the output of one command (job) submitted:
+	[6] To check the status of all (short and long running) submitted jobs:
 	
-	https://<server-ip-address>:<port>/jobs/results?id=<job-id>
+	https://<server-ip-address>:<port>/worker/v1/jobs/x/stop/all?order=[asc|desc]
 
 	[+] On Windows or Linux Operating System.
-	example: https://127.0.0.1:8080/jobs/results?id=abe478954cef4125
+	example: https://127.0.0.1:8080/worker/v1/jobs/x/status/check/all
+	example: https://127.0.0.1:8080/worker/v1/jobs/x/status/check/all?order=asc
+	example: https://127.0.0.1:8080/worker/v1/jobs/x/status/check/all?order=desc
 
-	----------------------------------------------------------------------------------------------
+	----------
 
-	[5] To check the status of all submitted commands (jobs):
+	[7] To fetch the output of a single short running job by its id:
 	
-	https://<server-ip-address>:<port>/jobs/status/
-	https://<server-ip-address>:<port>/jobs/stats/
+	https://<server-ip-address>:<port>/worker/v1/jobs/short/output/fetch?id=<job-id>
 
 	[+] On Windows or Linux Operating System.
-	example: https://127.0.0.1:8080/jobs/status/
-	example: https://127.0.0.1:8080/jobs/stats/
+	example: https://127.0.0.1:8080/worker/v1/jobs/short/output/fetch?id=abe478954cef4125
 
-	----------------------------------------------------------------------------------------------
+	----------
 
-	[6] To stop of one or more submitted running commands (jobs):
+	[8] To stop one or multiple submitted and running jobs:
 	
-	https://<server-ip-address>:<port>/jobs/stop?id=<job-1-id>&id=<job-2-id>
+	https://<server-ip-address>:<port>/worker/v1/jobs/x/stop?id=<job-1-id>&id=<job-2-id>
 
 	[+] On Windows or Linux Operating System.
-	example: https://127.0.0.1:8080/jobs/stop?id=abe478954cef4125&id=cde478910cef4125
+	example: https://127.0.0.1:8080/worker/v1/jobs/x/stop?id=abe478954cef4125&id=cde478910cef4125
 
-	----------------------------------------------------------------------------------------------
+	----------
 
-	[7] To stop of all submitted running commands (jobs):
+	[9] To stop of all (short and long) submitted running jobs:
 	
-	https://<server-ip-address>:<port>/jobs/stop/
+	https://<server-ip-address>:<port>/worker/v1/jobs/x/stop/all
 
 	[+] On Windows or Linux Operating System.
-	example: https://127.0.0.1:8080/jobs/stop/
+	example: https://127.0.0.1:8080/worker/v1/jobs/x/stop/all
 
-	----------------------------------------------------------------------------------------------
+	----------
 
-	[8] To restart one or more submitted commands (jobs):
+	[10] To restart one or multiple submitted jobs:
 	
-	https://<server-ip-address>:<port>/jobs/restart?id=<job-1-id>&id=<job-2-id>
+	https://<server-ip-address>:<port>/worker/v1/jobs/x/restart?id=<job-1-id>&id=<job-2-id>
 
 	[+] On Windows or Linux Operating System.
-	example: https://127.0.0.1:8080/jobs/restart?id=abe478954cef4125&id=cde478910cef4125
+	example: https://127.0.0.1:8080/worker/v1/jobs/x/restart?id=abe478954cef4125&id=cde478910cef4125
 
-	----------------------------------------------------------------------------------------------
+	----------
 
-	[9] To restart all submitted commands (jobs):
+	[11] To restart all (only short running) submitted jobs:
 	
-	https://<server-ip-address>:<port>/jobs/restart/
+	https://<server-ip-address>:<port>/worker/v1/jobs/x/restart/all
 
 	[+] On Windows or Linux Operating System.
-	example: https://127.0.0.1:8080/jobs/restart/
+	example: https://127.0.0.1:8080/worker/v1/jobs/x/restart/all
 
-	----------------------------------------------------------------------------------------------
+	----------
 
 	`
