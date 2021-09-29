@@ -13,7 +13,7 @@
             // const jobid = "{{.id}}";
             var output = document.getElementById("output");
             console.log("connecting to websocket server ...");
-            const sock = new WebSocket("wss://{{.server}}/jobs/results/stream?id={{.id}}");
+            const sock = new WebSocket("wss://{{.server}}/worker/v1/jobs/long/output/stream?id={{.id}}");
             
             sock.onopen = function() {
                 console.log("websocket connection to server successfully established");

@@ -3,18 +3,19 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"fmt"
 	"github.com/gorilla/websocket"
 	"html/template"
 	"io"
+	"log"
 	"net/http"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
-	"os"
-	"log"
 )
 
 // characteristics to apply when moving to connection to websocket.
@@ -37,7 +38,7 @@ func init() {
 // createOutputsFolder makes sure that "outputs" folder if present - if not create it.
 func createOutputsFolder() {
 	info, err := os.Stat("outputs")
-	if !os.IsExist(err) {
+	if errors.Is(err, os.ErrNotExist) {
 		// path does not exist.
 		err := os.Mkdir("outputs", 0755)
 		if err != nil {
@@ -140,7 +141,7 @@ func streamJob(ws *websocket.Conn, id string) {
 	if job.isstreaming {
 		defer job.lock.RUnlock()
 		// job output streaming is already being consumed.
-		ws.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("\nThe job output stream is already being consumed. Only one live streaming at a moment. You can stop the job with /jobs/stop?id=%s", id)))
+		ws.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("\nThe job output stream is already being consumed. Only one live streaming at a moment or you can stop the job.")))
 		return
 	}
 	job.lock.RUnlock()
@@ -266,7 +267,7 @@ func scheduleLongJobsWithStreaming(w http.ResponseWriter, r *http.Request) {
 		// add this job to the processing queue.
 		globalJobsQueue <- job
 		jobslog.Printf("[%s] [%05d] scheduled the processing of the job\n", job.id, job.pid)
-		http.Redirect(w, r, fmt.Sprintf("https://%s//jobs/results/stream?id=%s", r.Host, job.id), http.StatusMovedPermanently)
+		http.Redirect(w, r, fmt.Sprintf("https://%s/worker/v1/jobs/long/output/stream?id=%s", r.Host, job.id), http.StatusMovedPermanently)
 		return
 	}
 

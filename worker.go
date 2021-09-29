@@ -47,7 +47,7 @@ import (
 // Author   : Jerome AMON
 // Created  : 20 August 2021
 
-const address = "127.0.0.1:8080"
+const address = "0.0.0.0:8080"
 
 // fixed path of server certs & private key.
 const serverCertsPath = "certs/server.crt"
@@ -1430,7 +1430,7 @@ func logRequestMiddleware(next http.Handler) http.Handler {
 // createCertsFolder makes sure that "certs" if present - if not create it.
 func createCertsFolder() {
 	info, err := os.Stat("certs")
-	if !os.IsExist(err) {
+	if errors.Is(err, os.ErrNotExist) {
 		// path does not exist.
 		err := os.Mkdir("certs", 0755)
 		if err != nil {
