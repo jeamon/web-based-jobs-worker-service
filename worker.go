@@ -1429,7 +1429,7 @@ func logRequestMiddleware(next http.Handler) http.Handler {
 
 // createFolder makes sure that <folderName> is present, and if not creates it.
 func createFolder(folderName string) {
-	info, err := os.Stat("certs")
+	info, err := os.Stat(folderName)
 	if errors.Is(err, os.ErrNotExist) {
 		// path does not exist.
 		err := os.Mkdir(folderName, 0755)
