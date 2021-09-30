@@ -1427,14 +1427,14 @@ func logRequestMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// createCertsFolder makes sure that "certs" if present - if not create it.
-func createCertsFolder() {
+// createFolder makes sure that <folderName> is present, and if not creates it.
+func createFolder(folderName string) {
 	info, err := os.Stat("certs")
 	if errors.Is(err, os.ErrNotExist) {
 		// path does not exist.
-		err := os.Mkdir("certs", 0755)
+		err := os.Mkdir(folderName, 0755)
 		if err != nil {
-			log.Printf("failed create %q folder - errmsg : %v\n", "certs", err)
+			log.Printf("failed create %q folder - errmsg : %v\n", folderName, err)
 			// try to remove PID file.
 			os.Remove(pidFile)
 			os.Exit(1)
@@ -1442,7 +1442,7 @@ func createCertsFolder() {
 	} else {
 		// path already exists but could be file or directory.
 		if !info.IsDir() {
-			log.Printf("path %q exists but it is not a folder so please check before continue - errmsg : %v\n", "certs", err)
+			log.Printf("path %q exists but it is not a folder so please check before continue - errmsg : %v\n", folderName, err)
 			// try to remove PID file.
 			os.Remove(pidFile)
 			os.Exit(0)
@@ -1454,8 +1454,8 @@ func createCertsFolder() {
 // format after has saved them on disk. It aborts the program if any failure during the process.
 func generateServerCertificate() ([]byte, []byte) {
 	log.Println("generating new self-signed server's certificate and private key")
-	// if not present create folder named "certs" to store server's certs & key.
-	createCertsFolder()
+	// ensure the presence of "certs" folder to store server's certs & key.
+	createFolder("certs")
 	// https://pkg.go.dev/crypto/x509#Certificate
 	serverCerts := &x509.Certificate{
 		SignatureAlgorithm: x509.SHA256WithRSA,
