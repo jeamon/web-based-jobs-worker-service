@@ -3,7 +3,8 @@
 A go-based fast backend service to spin up and control (stop or fetch or restart or delete) multiple remote jobs (applications or shell commands)
 with the capabilities to specify the execution timeout and resources limitations for these jobs. You perform everything just from your web browser. 
 
-* Click to watch the live [demo video](https://youtu.be/_xnINhN8MRI)
+* General Features Overview - Click to watch the live [demo video](https://youtu.be/_xnINhN8MRI)
+* Dual Streaming Feature - Click to watch the live [demo video](https://youtu.be/NsM7AhWkCko)
 
 
 ## Table of contents
@@ -208,7 +209,7 @@ $ docker run -d --publish 8080:8080 --name unix-worker --rm unix-worker /bin/sh 
 	```
 
 
-* To check the status of all submitted jobs:
+* To check the status of all (short and long running) submitted jobs:
 	
 	```
 	https://<server-ip-address>:<port>/worker/v1/jobs/x/stop/all?order=[asc|desc]
@@ -234,7 +235,7 @@ $ docker run -d --publish 8080:8080 --name unix-worker --rm unix-worker /bin/sh 
 	```
 
 
-* To stop one or multiple submitted running jobs:
+* To stop one or multiple submitted and running jobs:
 	
 	```
 	https://<server-ip-address>:<port>/worker/v1/jobs/x/stop?id=<job-1-id>&id=<job-2-id>
@@ -286,7 +287,7 @@ $ docker run -d --publish 8080:8080 --name unix-worker --rm unix-worker /bin/sh 
 ## Upcomings
 
 * add filter option to display details of only completed or stopped or running jobs
-* add capability to load configuration details from file at startup
+* add capability to load configuration details from a file at start time
 * add option to store jobs result to redis server rather than in-memory map
 * add URI and handler to download execution output of one or multiple jobs by ids 
 * add command line options on worker service to list or delete jobs or dump jobs output
@@ -295,6 +296,8 @@ $ docker run -d --publish 8080:8080 --name unix-worker --rm unix-worker /bin/sh 
 * identify each web request with a unique id for further tracing using middleware & http context
 * limit the overall number of jobs scheduling to 10K and make it dynamically configurable
 * embed websocket html/JS template file into executable by leveraging golang 1.16 feature
+* dump dead jobs output to disk file before removing them from the result queue - cleanupMapResults()
+* embed a RestFul API service to schedule - status check - stop/restart - fetch jobs : /worker/<api>/v1/
 
 
 
