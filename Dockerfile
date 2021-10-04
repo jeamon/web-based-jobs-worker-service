@@ -1,7 +1,7 @@
 #== FROM golang:1.17-alpine
 FROM golang:alpine
 
-LABEL maintainer="Jerome Amon <https://blog.cloudmentor-scale.com>"
+LABEL maintainer="Jerome Amon <https://blog.cloudmentor-scale.com/contact>"
 LABEL build_date="2021-08-20"
 
 #== Create an /app directory within image to hold source fils
@@ -10,16 +10,11 @@ RUN mkdir /app
 #== Setting up working directory
 WORKDIR /app
 
-#== Copy the dep files to the container’s workspace.
-# or to copy all COPY . /app
-COPY go.mod ./
+#== Copy all files to the container’s workspace.
+COPY . /app
 
 #== Download and install all dependencies
 RUN go mod download
-
-#== Copy the local package files to the container’s workspace.
-COPY worker.go ./
-COPY help.go ./
 
 #== Build the worker program inside the container.
 RUN go build -o worker .

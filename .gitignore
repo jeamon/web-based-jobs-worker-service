@@ -5,7 +5,8 @@
 *.log
 *.txt
 
-# Ignore the startup logs folder
+# Ignore all logs folder
+logs
 *.logs
 
 # Ignore current worker deamon pid
