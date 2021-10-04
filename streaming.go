@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/gorilla/websocket"
-	"html/template"
 	"io"
 	"net/http"
 	"regexp"
@@ -23,14 +22,6 @@ var upgrader = websocket.Upgrader{
 }
 
 var connectionUpgradeRegex = regexp.MustCompile("(^|.*,\\s*)upgrade($|\\s*,)")
-var tmpl *template.Template
-
-func init() {
-	// compile stream web page template.
-	tmpl = template.Must(template.ParseFiles("websocket.html"))
-	// ensure <outputs> folder is present.
-	createFolder("outputs")
-}
 
 // serveStreamPage delivers the web page which contains javascript code to initiate websocket connection.
 func serveStreamPage(w http.ResponseWriter, r *http.Request) {
@@ -101,13 +92,13 @@ func streamJob(ws *websocket.Conn, id string) {
 
 	if job.iscompleted {
 		// job already finished, pull the result rather than stream.
-		ws.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("\nThe job is no longer running - pull its full output from /jobs/results?id=%s", id)))
+		ws.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("\nSorry, the job []%s] is no longer running - you can check its status.", id)))
 		return
 	}
 
 	if !job.islong {
 		// job is not a long running task for stream, pull the result rather than stream.
-		ws.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("\nThe job was not submitted as a long running task - pull its full output from /jobs/results?id=%s", id)))
+		ws.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("\nThe job was not submitted as a long running task - pull its full output from worker/web/v1/jobs/output/fetch?id=%s", id)))
 		return
 	}
 
@@ -192,7 +183,7 @@ func scheduleLongJobsWithStreaming(w http.ResponseWriter, r *http.Request) {
 	// default memory (megabytes) and cpu (percentage) limit values.
 	memlimit := 100
 	cpulimit := 10
-	timeout := longJobTimeout
+	timeout := Config.LongJobTimeout
 	dump := false
 	// extract only first value of mem and cpu query string.
 	if m, err := strconv.Atoi(query.Get("mem")); err == nil && m > 0 {
@@ -203,7 +194,7 @@ func scheduleLongJobsWithStreaming(w http.ResponseWriter, r *http.Request) {
 		cpulimit = c
 	}
 	// retreive timeout parameter value and consider it if higher than 0.
-	if t, err := strconv.Atoi(query.Get("timeout")); err == nil && t > 0 && t <= longJobTimeout {
+	if t, err := strconv.Atoi(query.Get("timeout")); err == nil && t > 0 && t <= Config.LongJobTimeout {
 		timeout = t
 	}
 
@@ -241,7 +232,7 @@ func scheduleLongJobsWithStreaming(w http.ResponseWriter, r *http.Request) {
 		// add this job to the processing queue.
 		globalJobsQueue <- job
 		jobslog.Printf("[%s] [%05d] scheduled the processing of the job\n", job.id, job.pid)
-		http.Redirect(w, r, fmt.Sprintf("https://%s/worker/v1/jobs/long/output/stream?id=%s", r.Host, job.id), http.StatusMovedPermanently)
+		http.Redirect(w, r, fmt.Sprintf("https://%s/worker/web/v1/jobs/long/output/stream?id=%s", r.Host, job.id), http.StatusMovedPermanently)
 		return
 	}
 
