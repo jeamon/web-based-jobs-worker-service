@@ -351,10 +351,9 @@ func getJobsOutputById(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// increment number of the job result calls.
-	// mapLock.Lock()
+	job.lock.Lock()
 	job.fetchcount += 1
-	// atomic.AddInt64((*job).getCount, 1)
-	// mapLock.Unlock()
+	job.lock.Unlock()
 	// job present - send the result field data.
 	w.WriteHeader(200)
 	fmt.Fprintln(w, fmt.Sprintf("Hello • Find below the result of Job ID [%s]", (*job).id))
@@ -621,7 +620,7 @@ func restartJobsById(w http.ResponseWriter, r *http.Request) {
 		} else {
 			// job already completed (not running). reset and start it by adding to jobs queue.
 			mapLock.Lock()
-			resetCompletedJobInfos(job)
+			job.resetCompletedJobInfos()
 			mapLock.Unlock()
 			globalJobsQueue <- job
 			jobslog.Printf("[%s] [%05d] restart requested for the completed job. reset the details and scheduled the job\n", job.id, job.pid)
@@ -679,7 +678,7 @@ func restartAllJobs(w http.ResponseWriter, r *http.Request) {
 
 		} else {
 			// job already completed (not running). so reset and start it by adding to jobs queue in parallel.
-			resetCompletedJobInfos(job)
+			job.resetCompletedJobInfos()
 			globalJobsQueue <- job
 			jobslog.Printf("[%s] [%05d] restart requested for the completed job. reset the details and scheduled job onto processing queue\n", job.id, job.pid)
 			fmt.Fprintln(w, fmt.Sprintf("|%04d | %-18s | %-14s | %-16s | %-12s |", i, job.id, "no", "n/a", "yes"))

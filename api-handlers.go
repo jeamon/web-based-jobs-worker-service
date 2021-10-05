@@ -243,8 +243,9 @@ func apiFetchJobsOutputById(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// increment number of the job result calls.
+	job.lock.Lock()
 	job.fetchcount += 1
-	// job present - send the result field data.
+	job.lock.Unlock()
 
 	// send response data into json format.
 	w.Header().Set("Content-Type", "application/json;charset=UTF-8")
