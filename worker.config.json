@@ -14,7 +14,7 @@
 	"JobsDeletionLogFile": "deleted.log",
 	"DefaultLinuxShell": "/bin/sh",
 	"JobsOutputsFolder": "./outputs",
-	"WorkerWorkingDirectory": ".",
+	"WorkerWorkingDirectory": "./",
 	"JobsCleanupMaxFetch": 10,
 	"JobsCleanupRunInterval": 12,
 	"JobsCleanupMaxAge": 24,
