@@ -113,15 +113,15 @@ func createFolder(folderPath string) {
 }
 
 // resetCompletedJobInfos resets a given job details (only if it has been completed/stopped before) for restarting.
-func resetCompletedJobInfos(j *Job) {
-	j.pid = 0
-	j.iscompleted, j.issuccess = false, false
-	j.fetchcount = 0
-	j.isstreaming = false
-	j.exitcode = -1
-	j.errormsg = ""
-	j.starttime, j.endtime = time.Time{}, time.Time{}
-	(j.result).Reset()
+func (job *Job) resetCompletedJobInfos() {
+	job.pid = 0
+	job.iscompleted, job.issuccess = false, false
+	job.fetchcount = 0
+	job.isstreaming = false
+	job.exitcode = -1
+	job.errormsg = ""
+	job.starttime, job.endtime = time.Time{}, time.Time{}
+	(job.result).Reset()
 }
 
 // removeDuplicateJobIds rebuilds the slice of job ids (string type) by verifying the format and deleting
