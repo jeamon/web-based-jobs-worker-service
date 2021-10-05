@@ -177,7 +177,7 @@ func SendErrorMessage(w http.ResponseWriter, requestid string, message string, c
 
 // scheduledInfos Job method to returns essential details once a job is just scheduled.
 func (job *Job) scheduledInfos() JobScheduledInfos {
-	s := JobScheduledInfos{
+	info := JobScheduledInfos{
 		Id:         job.id,
 		Task:       job.task,
 		IsLong:     job.islong,
@@ -187,10 +187,16 @@ func (job *Job) scheduledInfos() JobScheduledInfos {
 		Dump:       job.dump,
 		SubmitTime: (job.submittime).Format("2006-01-02 15:04:05"),
 		StatusLink: fmt.Sprintf("https://%s:%s/worker/api/v1/jobs/status?id=%s", Config.HttpsServerHost, Config.HttpsServerPort, job.id),
-		OutputLink: fmt.Sprintf("https://%s:%s/worker/api/v1/jobs/fetch?id=%s", Config.HttpsServerHost, Config.HttpsServerPort, job.id),
 	}
 
-	return s
+	if job.islong {
+		// long job must use websocket to stream output.
+		info.OutputLink = fmt.Sprintf("https://%s:%s/worker/web/v1/jobs/long/output/stream?id=%s", Config.HttpsServerHost, Config.HttpsServerPort, job.id)
+	} else {
+		info.OutputLink = fmt.Sprintf("https://%s:%s/worker/api/v1/jobs/fetch?id=%s", Config.HttpsServerHost, Config.HttpsServerPort, job.id)
+	}
+
+	return info
 }
 
 // collectStatusInfos Job method to returns full status details a job.
@@ -243,7 +249,13 @@ func (job *Job) collectStatusInfos() JobStatusInfos {
 		SubmitTime:  (job.submittime).Format("2006-01-02 15:04:05"),
 		StartTime:   start,
 		EndTime:     end,
-		OutputLink:  fmt.Sprintf("https://%s:%s/worker/api/v1/jobs/fetch?id=%s", Config.HttpsServerHost, Config.HttpsServerPort, job.id),
+	}
+
+	if job.islong {
+		// long job must use websocket to stream output.
+		info.OutputLink = fmt.Sprintf("https://%s:%s/worker/web/v1/jobs/long/output/stream?id=%s", Config.HttpsServerHost, Config.HttpsServerPort, job.id)
+	} else {
+		info.OutputLink = fmt.Sprintf("https://%s:%s/worker/api/v1/jobs/fetch?id=%s", Config.HttpsServerHost, Config.HttpsServerPort, job.id)
 	}
 
 	return info
