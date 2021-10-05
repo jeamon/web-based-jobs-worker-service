@@ -12,8 +12,11 @@ import (
 	"time"
 )
 
-// custom logger for program details.
+// custom logger for web requests.
 var weblog *log.Logger
+
+// custom logger for api calls.
+var apilog *log.Logger
 
 // custom logger for tracing jobs deletion.
 var deletedjobslog *log.Logger
@@ -49,16 +52,26 @@ func setupLoggers() {
 	}
 
 	// create the log file for web server requests.
-	logfile, err := os.OpenFile(filepath.Join(logsFolderPath, Config.WebRequestsLogFile), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
+	weblogfile, err := os.OpenFile(filepath.Join(logsFolderPath, Config.WebRequestsLogFile), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
 	if err != nil {
-		log.Printf("program aborted - failed to create requests log file - errmsg: %v\n", err)
+		log.Printf("program aborted - failed to create web requests log file - errmsg: %v\n", err)
 		// try to remove PID file.
 		os.Remove(Config.WorkerPidFilePath)
 		os.Exit(1)
 	}
-
 	// setup logging format and parameters.
-	weblog = log.New(logfile, "", log.LstdFlags|log.Lshortfile)
+	weblog = log.New(weblogfile, "", log.LstdFlags|log.Lshortfile)
+
+	// create the log file for api calls.
+	apilogfile, err := os.OpenFile(filepath.Join(logsFolderPath, Config.ApiRequestsLogFile), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
+	if err != nil {
+		log.Printf("program aborted - failed to create api calls log file - errmsg: %v\n", err)
+		// try to remove PID file.
+		os.Remove(Config.WorkerPidFilePath)
+		os.Exit(1)
+	}
+	// setup logging format and parameters.
+	apilog = log.New(apilogfile, "", log.LstdFlags|log.Lshortfile)
 
 	// create file to log deleted jobs by cleanupMapResults goroutine.
 	deletedjobslogfile, err := os.OpenFile(filepath.Join(logsFolderPath, Config.JobsDeletionLogFile), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
@@ -68,7 +81,6 @@ func setupLoggers() {
 		os.Remove(Config.WorkerPidFilePath)
 		os.Exit(1)
 	}
-
 	// setup logging format and parameters.
 	deletedjobslog = log.New(deletedjobslogfile, "", log.LstdFlags|log.Lshortfile)
 
@@ -80,8 +92,8 @@ func setupLoggers() {
 		os.Remove(Config.WorkerPidFilePath)
 		os.Exit(1)
 	}
-
 	// setup logging format and parameters.
 	jobslog = log.New(jobslogfile, "", log.LstdFlags|log.Lshortfile)
+
 	log.Println("logs folder and all log files successfully created.")
 }
