@@ -33,13 +33,13 @@ func generateServerCertificate() ([]byte, []byte) {
 		// define the PKIX (Internet Public Key Infrastructure Using X.509).
 		// fill each field with the right information based on your context.
 		Subject: pkix.Name{
-			Organization:  []string{"My Company"},
-			Country:       []string{"My Country"},
-			Province:      []string{"My City"},
-			Locality:      []string{"My Locality"},
-			StreetAddress: []string{"My Street Address"},
-			PostalCode:    []string{"00000"},
-			CommonName:    "localhost",
+			Organization:  []string{Config.OrganizationNameForCerts},
+			Country:       []string{Config.CountryCodeForCerts},
+			Province:      []string{Config.ProvinceNameForCerts},
+			Locality:      []string{Config.CityNameForCerts},
+			StreetAddress: []string{Config.StreetAddressForCerts},
+			PostalCode:    []string{Config.PostalCodeForCerts},
+			CommonName:    Config.HttpsServerHost,
 		},
 
 		NotBefore: time.Now(),
