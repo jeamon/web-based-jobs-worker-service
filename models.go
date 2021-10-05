@@ -1,5 +1,7 @@
 package main
 
+// @models.go contains all structure definitions used into this project.
+
 import (
 	"bytes"
 	"io"
@@ -65,4 +67,77 @@ type Configuration struct {
 	EnableWebAccess        bool   `json:"EnableWebAccess"`        // specifies if web routes should be setup or not.
 	EnableAPIGateway       bool   `json:"EnableAPIGateway"`       // specifies if api routes should be setup or not.
 	MaxNumberOfJobs        int    `json:"MaxNumberOfJobs"`        // maximum number of jobs that could be processed.
+}
+
+type ApiErrorMessage struct {
+	Status    bool   `json:"status"`
+	Message   string `json:"message"`
+	Code      int    `json:"code"`
+	RequestId string `json:"requestid"`
+}
+
+// POST /worker/api/v1/jobs/schedule
+type RequestJobsSchedule struct {
+	Jobs []JobScheduleModel `json:"jobs"`
+}
+
+type JobScheduleModel struct {
+	Task     string `json:"task,omitempty"`
+	IsLong   bool   `json:"islong,omitempty"`
+	Dump     bool   `json:"dump"`
+	MemLimit int    `json:"memlimit,omitempty"`
+	CpuLimit int    `json:"cpulimit,omitempty"`
+	Timeout  int    `json:"timeout,omitempty"`
+}
+
+// Response of POST /worker/api/v1/jobs/schedule
+type ResponseJobsSchedule struct {
+	RequestId string              `json:"requestid"`
+	Jobs      []JobScheduledInfos `json:"jobs"`
+}
+
+type JobScheduledInfos struct {
+	Id         string `json:"id"`
+	Task       string `json:"task"`
+	IsLong     bool   `json:"islong"`
+	MemLimit   int    `json:"memlimit"`
+	CpuLimit   int    `json:"cpulimit"`
+	Timeout    int    `json:"timeout"`
+	Dump       bool   `json:"dump"`
+	SubmitTime string `json:"submittime"`
+	StatusLink string `json:"statuslink"`
+	OutputLink string `json:"outputlink"`
+}
+
+// Response of GET /worker/api/v1/jobs/status?id=<jobid>&id=<jobid>&id=<jobid>
+type ResponseCheckJobsStatus struct {
+	RequestId  string           `json:"requestid"`
+	Infos      []JobStatusInfos `json:"infos"`
+	UnknownIds []string         `json:"unknownids,omitempty"`
+}
+
+type JobStatusInfos struct {
+	Id          string `json:"id"`
+	Pid         int    `json:"pid"`
+	Task        string `json:"task"`
+	IsLong      bool   `json:"islong"`
+	IsCompleted bool   `json:"iscompleted"`
+	IsSuccess   bool   `json:"issuccess"`
+	ExitCode    int    `json:"exitcode"`
+	DataSize    string `json:"datasize"`
+	FetchCount  int    `json:"fetchcount"`
+	MemLimit    int    `json:"memlimit"`
+	CpuLimit    int    `json:"cpulimit"`
+	Timeout     int    `json:"timeout"`
+	Dump        bool   `json:"dump"`
+	SubmitTime  string `json:"submittime"`
+	StartTime   string `json:"starttime"`
+	EndTime     string `json:"endtime"`
+	OutputLink  string `json:"outputlink"`
+}
+
+// Response of GET /worker/api/v1/jobs/fetch?id=<jobid>
+type ResponseFetchJobOutput struct {
+	RequestId string `json:"requestid"`
+	Output    string `json:"output"`
 }
