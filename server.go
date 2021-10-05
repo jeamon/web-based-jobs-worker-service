@@ -63,10 +63,14 @@ func startWebServer(exit <-chan struct{}) error {
 		setupWebServerRoutes(router)
 	}
 
+	if Config.EnableAPIGateway {
+		setupApiGatewayRoutes(router)
+	}
+
 	address := fmt.Sprintf("%s:%s", Config.HttpsServerHost, Config.HttpsServerPort)
 	webserver := &http.Server{
 		Addr:         address,
-		Handler:      logRequestMiddleware(router),
+		Handler:      requestMiddleware(router),
 		ErrorLog:     weblog,
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 60 * time.Second,
@@ -90,18 +94,15 @@ func startWebServer(exit <-chan struct{}) error {
 			} else {
 				log.Printf("an error occured when closing underlying listeners.")
 			}
-
 			return
 		}
-
 		// err = nil - successfully shutdown the server.
 		log.Println("the web server was successfully shutdown down.")
-
 	}()
 
 	// make listen on all interfaces - helps on container binding
 	// if shutdown error will be http.ErrServerClosed.
-	log.Printf("starting https only web server on %s ...\n", address)
+	log.Printf("starting https web server and api gateway on %s ...\n", address)
 	weblog.Printf("starting web server at %s\n", address)
 	if err := webserver.ListenAndServeTLS("", ""); err != nil && err != http.ErrServerClosed {
 		log.Fatalf("failed to start the web server on %s - errmsg: %v\n", address, err)
