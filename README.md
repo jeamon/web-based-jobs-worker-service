@@ -120,6 +120,20 @@ $ docker run -d --publish 8080:8080 --name unix-worker --rm unix-worker /bin/sh 
 	```
 
 	
+* To view this documentation online - for web access or apis calls:
+	
+	```
+	https://<server-ip-address>:<port>/worker/web/v1/docs
+	https://<server-ip-address>:<port>/worker/api/v1/docs
+	```
+	
+	[+] From your web browser.
+	```
+	example: https://127.0.0.1:8080/worker/web/v1/docs
+	example: https://127.0.0.1:8080/worker/api/v1/docs
+	```
+
+
 * To execute a quick remote command (optionally with timeout in secs) and get the realtime output:
 	
 	```
@@ -308,7 +322,7 @@ $ docker run -d --publish 8080:8080 --name unix-worker --rm unix-worker /bin/sh 
 * limit the overall number of jobs scheduling to 10K and make it dynamically configurable
 * embed websocket html/JS template file into executable by leveraging golang 1.16 feature
 * dump dead jobs output to disk file before removing them from the result queue - cleanupMapResults()
-* embed a RestFul API service to schedule - status check - stop/restart - fetch jobs : /worker/<api>/v1/
+* embed a RestFul API service to schedule - status check - stop/restart - fetch jobs : /worker/api/v1/
 
 
 
