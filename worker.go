@@ -270,8 +270,8 @@ func startWorkerService() error {
 	// launch the program with deamon as argument
 	// syscall exec is not the same as fork.
 	cmd := exec.Command(os.Args[0], "run")
-	// setup the deamon working directory current folder.
-	cmd.Dir = "."
+	// setup the process working directory.
+	cmd.Dir = Config.WorkerWorkingDirectory
 	// single file to log output of worker - read by all and write only by the user.
 	workerlog, err := os.OpenFile(Config.WorkerLogFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
