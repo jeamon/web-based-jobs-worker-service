@@ -16,8 +16,8 @@ import (
 	"time"
 )
 
-// cleanupMapResults runs every <interval> hours and delete job which got <maxcount>
-// times requested or completed for more than <deadtime> hours.
+// cleanupMapResults runs every <interval> hours and delete completed job which
+//  reached <maxcount> times fetching or completed for more than <deadtime> hours.
 func cleanupMapResults(interval int, maxcount int, deadtime int, exit <-chan struct{}, wg *sync.WaitGroup) {
 	log.Println("started goroutine to cleanup stalling jobs ...")
 	defer wg.Done()
@@ -30,10 +30,19 @@ func cleanupMapResults(interval int, maxcount int, deadtime int, exit <-chan str
 			// waiting time passed so lock the map and loop over each (*job).
 			mapLock.Lock()
 			for id, job := range globalJobsResults {
-				if job.fetchcount > maxcount || (time.Since(job.endtime) > (time.Duration(deadtime) * time.Minute)) {
-					// remove job which was terminated since deadtime hours or requested 10 times.
+				if job.iscompleted && (job.fetchcount > maxcount || (time.Since(job.endtime) > (time.Duration(deadtime) * time.Minute))) {
+					// job terminated and reached deadtime or max fetch count.
+					// so, if it is a short job dump its output. Then delete it.
+					if !job.islong {
+						filenameSuffix := fmt.Sprintf("%02d%02d%02d.%s.txt", job.submittime.Year(), job.submittime.Month(), job.submittime.Day(), job.id)
+						filename := filepath.Join(Config.JobsOutputsFolder, filenameSuffix)
+						if err := os.WriteFile(filename, job.result.Bytes(), 0644); err != nil {
+							deletedjobslog.Printf("[%s] [%05d] cleanup routine failed to dump job output before deletion.\n", id, job.id)
+						}
+					}
+
 					delete(globalJobsResults, id)
-					deletedjobslog.Printf("[%s] [%05d] cleanup routine removed job from the results queue\n", id, job.id)
+					deletedjobslog.Printf("[%s] [%05d] cleanup routine removed job from the results queue.\n", id, job.id)
 				}
 			}
 			mapLock.Unlock()
