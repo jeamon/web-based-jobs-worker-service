@@ -41,39 +41,43 @@ type Job struct {
 
 // Configuation is the structure of the expected json data to be loaded from the config file <worker.config.json>.
 type Configuration struct {
-	HttpsServerHost          string `json:"HttpsServerHost"`          // https server ip or dns.
-	HttpsServerPort          string `json:"HttpsServerPort"`          // https server port number.
-	HttpsServerCerts         string `json:"HttpsServerCerts"`         // https server certificate filename.
-	HttpsServerKey           string `json:"HttpsServerKey"`           // https server private key filename.
-	HttpsServerCertsPath     string `json:"HttpsServerCertsPath"`     // where to find https server certs/key.
-	HttpsServerCertsEmail    string `json:"HttpsServerCertsEmail"`    // email to use when building server certs.
-	WorkerPidFilePath        string `json:"WorkerPidFilePath"`        // worker service process identifier file.
-	WorkerLogFilePath        string `json:"WorkerLogFilePath"`        // place to store worker process outputs.
-	LogFoldersLocation       string `json:"LogFoldersLocation"`       // folder to store daily startup logs.
-	WebRequestsLogFile       string `json:"WebRequestsLogFile"`       // file to create and storing all web requests.
-	ApiRequestsLogFile       string `json:"ApiRequestsLogFile"`       // file to create for storing all api calls.
-	JobsProcessLogFile       string `json:"JobsProcessLogFile"`       // file to create for storing jobs processing lifecycle.
-	JobsDeletionLogFile      string `json:"JobsDeletionLogFile"`      // file to create for tracking auto-deleted jobs details.
-	DefaultLinuxShell        string `json:"DefaultLinuxShell"`        // shell path to be used on linux platform as last resort.
-	JobsOutputsFolder        string `json:"JobsOutputsFolder"`        // folder to create for storing long jobs outputs dump.
-	WorkerWorkingDirectory   string `json:"WorkerWorkingDirectory"`   // path to be used as worker process directory.
-	JobsCleanupMaxFetch      int    `json:"JobsCleanupMaxFetch"`      // maximum number of output fetch to allow job deletion.
-	JobsCleanupRunInterval   int    `json:"JobsCleanupRunInterval"`   // each number of hours to check for jobs deletion.
-	JobsCleanupMaxAge        int    `json:"JobsCleanupMaxAge"`        // hours since job ended to consider as dead job to delete.
-	WaitTimeBeforeExit       int    `json:"WaitTimeBeforeExit"`       // seconds to pause before exiting from the worker.
-	ShortJobTimeout          int    `json:"ShortJobTimeout"`          // default and max timeout in seconds for short running jobs.
-	LongJobTimeout           int    `json:"LongJobTimeout"`           // default and max timeout in minutes for long running jobs.
-	MaxJobsQueueBuffer       int    `json:"MaxJobsQueueBuffer"`       // maximum jobs to queue at once on channel for pickup.
-	PidFileWatchInterval     int    `json:"PidFileWatchInterval"`     // each number of mins to check the pidfile presence before self-shutdown.
-	EnableWebAccess          bool   `json:"EnableWebAccess"`          // specifies if web routes should be setup or not.
-	EnableAPIGateway         bool   `json:"EnableAPIGateway"`         // specifies if api routes should be setup or not.
-	MaxNumberOfJobs          int    `json:"MaxNumberOfJobs"`          // maximum number of jobs that could be processed.
-	OrganizationNameForCerts string `json:"OrganizationNameForCerts"` // Organization name to be used for self-signed CA.
-	CountryCodeForCerts      string `json:"CountryCodeForCerts"`      // Country code to be used for self-signed certificate.
-	ProvinceNameForCerts     string `json:"ProvinceNameForCerts"`     // Province name to be used for self-signed certificate.
-	CityNameForCerts         string `json:"CityNameForCerts"`         // City name to be used for self-signed certificate.
-	StreetAddressForCerts    string `json:"StreetAddressForCerts"`    // Street name to be used for self-signed certificate.
-	PostalCodeForCerts       string `json:"PostalCodeForCerts"`       // Postal code to be used for self-signed certificate.
+	HttpsServerHost             string `json:"HttpsServerHost"`             // https server ip or dns.
+	HttpsServerPort             string `json:"HttpsServerPort"`             // https server port number.
+	HttpsServerCerts            string `json:"HttpsServerCerts"`            // https server certificate filename.
+	HttpsServerKey              string `json:"HttpsServerKey"`              // https server private key filename.
+	HttpsServerCertsPath        string `json:"HttpsServerCertsPath"`        // where to find https server certs/key.
+	HttpsServerCertsEmail       string `json:"HttpsServerCertsEmail"`       // email to use when building server certs.
+	WorkerPidFilePath           string `json:"WorkerPidFilePath"`           // worker service process identifier file.
+	WorkerLogFilePath           string `json:"WorkerLogFilePath"`           // place to store worker process outputs.
+	LogFoldersLocation          string `json:"LogFoldersLocation"`          // folder to store daily startup logs.
+	WebRequestsLogFile          string `json:"WebRequestsLogFile"`          // file to create and storing all web requests.
+	ApiRequestsLogFile          string `json:"ApiRequestsLogFile"`          // file to create for storing all api calls.
+	JobsProcessLogFile          string `json:"JobsProcessLogFile"`          // file to create for storing jobs processing lifecycle.
+	JobsDeletionLogFile         string `json:"JobsDeletionLogFile"`         // file to create for tracking auto-deleted jobs details.
+	DefaultLinuxShell           string `json:"DefaultLinuxShell"`           // shell path to be used on linux platform as last resort.
+	JobsOutputsFolder           string `json:"JobsOutputsFolder"`           // folder to create for storing long jobs outputs dump.
+	WorkerWorkingDirectory      string `json:"WorkerWorkingDirectory"`      // path to be used as worker process directory.
+	JobsCleanupMaxFetch         int    `json:"JobsCleanupMaxFetch"`         // maximum number of output fetch to allow job deletion.
+	JobsCleanupRunInterval      int    `json:"JobsCleanupRunInterval"`      // each number of hours to check for jobs deletion.
+	JobsCleanupMaxAge           int    `json:"JobsCleanupMaxAge"`           // hours since job ended to consider as dead job to delete.
+	WaitTimeBeforeExit          int    `json:"WaitTimeBeforeExit"`          // seconds to pause before exiting from the worker.
+	ShortJobTimeout             int    `json:"ShortJobTimeout"`             // default and max timeout in seconds for short running jobs.
+	LongJobTimeout              int    `json:"LongJobTimeout"`              // default and max timeout in minutes for long running jobs.
+	MaxJobsQueueBuffer          int    `json:"MaxJobsQueueBuffer"`          // maximum jobs to queue at once on channel for pickup.
+	PidFileWatchInterval        int    `json:"PidFileWatchInterval"`        // each number of mins to check the pidfile presence before self-shutdown.
+	EnableWebAccess             bool   `json:"EnableWebAccess"`             // specifies if web routes should be setup or not.
+	EnableAPIGateway            bool   `json:"EnableAPIGateway"`            // specifies if api routes should be setup or not.
+	MaxNumberOfJobs             int    `json:"MaxNumberOfJobs"`             // maximum number of jobs that could be processed.
+	OrganizationNameForCerts    string `json:"OrganizationNameForCerts"`    // Organization name to be used for self-signed CA.
+	CountryCodeForCerts         string `json:"CountryCodeForCerts"`         // Country code to be used for self-signed certificate.
+	ProvinceNameForCerts        string `json:"ProvinceNameForCerts"`        // Province name to be used for self-signed certificate.
+	CityNameForCerts            string `json:"CityNameForCerts"`            // City name to be used for self-signed certificate.
+	StreetAddressForCerts       string `json:"StreetAddressForCerts"`       // Street name to be used for self-signed certificate.
+	PostalCodeForCerts          string `json:"PostalCodeForCerts"`          // Postal code to be used for self-signed certificate.
+	MemoryLimitMaxMegaBytes     int    `json:"MemoryLimitMaxMegaBytes"`     // maximum memory usage for any job process in megabytes.
+	MemoryLimitDefaultMegaBytes int    `json:"MemoryLimitDefaultMegaBytes"` // default memory usage for any job process in megabytes.
+	CpuLimitDefaultPercentage   int    `json:"CpuLimitDefaultPercentage"`   // default cpu usage for any job process in percentage.
+	CpuLimitMaxPercentage       int    `json:"CpuLimitMaxPercentage"`       // maximum cpu usage for any job process in percentage.
 }
 
 type ApiErrorMessage struct {

@@ -44,8 +44,6 @@ func apiScheduleJobs(w http.ResponseWriter, r *http.Request) {
 
 	for _, jobInfos := range jobs {
 
-		memlimit = jobInfos.MemLimit
-		cpulimit = jobInfos.CpuLimit
 		timeout = jobInfos.Timeout
 
 		if jobInfos.IsLong {
@@ -67,12 +65,16 @@ func apiScheduleJobs(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		if jobInfos.CpuLimit <= 0 || jobInfos.CpuLimit >= 10 {
-			cpulimit = 10
+		if jobInfos.CpuLimit > 0 && jobInfos.CpuLimit <= Config.CpuLimitMaxPercentage {
+			cpulimit = jobInfos.CpuLimit
+		} else {
+			cpulimit = Config.CpuLimitDefaultPercentage
 		}
 
-		if jobInfos.MemLimit <= 0 || jobInfos.MemLimit >= 100 {
-			memlimit = 100
+		if jobInfos.MemLimit > 0 && jobInfos.MemLimit <= Config.MemoryLimitMaxMegaBytes {
+			memlimit = jobInfos.MemLimit
+		} else {
+			memlimit = Config.MemoryLimitDefaultMegaBytes
 		}
 
 		job := &Job{

@@ -25,5 +25,15 @@
 	"PidFileWatchInterval": 60,
 	"EnableWebAccess": true,
 	"EnableAPIGateway": true,
-	"MaxNumberOfJobs": 10000
+	"MaxNumberOfJobs": 10000,
+	"OrganizationNameForCerts": "",
+	"CountryCodeForCerts": "",
+	"ProvinceNameForCerts": "",
+	"CityNameForCerts": "",
+	"StreetAddressForCerts": "",
+	"PostalCodeForCerts": "",
+	"MemoryLimitMaxMegaBytes": 1000,
+	"MemoryLimitDefaultMegaBytes": 100,
+	"CpuLimitDefaultPercentage": 10,
+	"CpuLimitMaxPercentage": 25
 }

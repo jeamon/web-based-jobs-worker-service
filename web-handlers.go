@@ -378,15 +378,15 @@ func scheduleShortRunningJobs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// default memory (megabytes) and cpu (percentage) limit values.
-	memlimit := 100
-	cpulimit := 10
+	memlimit := Config.MemoryLimitDefaultMegaBytes
+	cpulimit := Config.CpuLimitDefaultPercentage
 	timeout := Config.ShortJobTimeout
-	// extract only first value of mem and cpu query string.
-	if m, err := strconv.Atoi(query.Get("mem")); err == nil && m > 0 {
+	// extract only first value of mem and cpu query string. they cannot be greater than maximum values.
+	if m, err := strconv.Atoi(query.Get("mem")); err == nil && m > 0 && m <= Config.MemoryLimitMaxMegaBytes {
 		memlimit = m
 	}
 
-	if c, err := strconv.Atoi(query.Get("cpu")); err == nil && c > 0 {
+	if c, err := strconv.Atoi(query.Get("cpu")); err == nil && c > 0 && c <= Config.CpuLimitMaxPercentage {
 		cpulimit = c
 	}
 	// retreive timeout parameter value and consider it if higher than 0.
