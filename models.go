@@ -17,6 +17,8 @@ type Job struct {
 	pid         int           // related job system process id.
 	task        string        // full command syntax to be executed.
 	islong      bool          // false:(short task) and true:(long task).
+	stream      bool          // if true then stream output over websocket.
+	dump        bool          // if true then save output to disk file.
 	memlimit    int           // maximum allowed memory usage in MB.
 	cpulimit    int           // maximum cpu percentage allowed for the job.
 	timeout     int           // in secs for short task and mins for long task.
@@ -32,7 +34,6 @@ type Job struct {
 	lock        *sync.RWMutex // job level mutex for access synchronization.
 	result      *bytes.Buffer // in-memory buffer to save output - getJobsOutputById().
 	filename    string        // filename where to dump long running job output.
-	dump        bool          // if true then save output to disk file.
 	submittime  time.Time     // datetime job was submitted.
 	starttime   time.Time     // datetime job was started.
 	endtime     time.Time     // datetime job was terminated.
@@ -88,9 +89,10 @@ type RequestJobsSchedule struct {
 }
 
 type JobScheduleModel struct {
-	Task     string `json:"task,omitempty"`
-	IsLong   bool   `json:"islong,omitempty"`
-	Dump     bool   `json:"dump"`
+	Task     string `json:"task"`   // full command syntax to be executed.
+	IsLong   bool   `json:"islong"` // short or long running job.
+	Stream   bool   `json:"stream"` // output should be live streamed over websocket.
+	Dump     bool   `json:"dump"`   // output should be live streamed in unique file.
 	MemLimit int    `json:"memlimit,omitempty"`
 	CpuLimit int    `json:"cpulimit,omitempty"`
 	Timeout  int    `json:"timeout,omitempty"`

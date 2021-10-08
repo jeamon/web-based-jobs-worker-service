@@ -90,49 +90,77 @@ func executeJob(job *Job, ctx context.Context) {
 	// combine standard process pipes, stdout & stderr.
 	cmd.Stderr = cmd.Stdout
 
-	if job.islong && !job.dump {
-		// long running job without saving to disk file so we only store the standard pipe for further streaming.
-		job.outpipe, err = cmd.StdoutPipe()
-		if err != nil {
-			// job should be streaming so abort this job scheduling.
-			job.endtime = time.Now().UTC()
-			job.iscompleted = true
-			jobslog.Printf("[%s] [%05d] error occured during the scheduling of the job - errmsg: %v\n", job.id, job.pid, err)
-			job.issuccess = false
-			job.errormsg = err.Error()
-			return
+	if job.islong {
+		// long running job.
+		if job.stream && !job.dump {
+			// with stream over websocket only. store the standard pipe for streaming.
+			job.outpipe, err = cmd.StdoutPipe()
+			if err != nil {
+				// job should be streaming so abort this job scheduling.
+				job.endtime = time.Now().UTC()
+				job.iscompleted = true
+				jobslog.Printf("[%s] [%05d] error occured during the scheduling of the job - errmsg: %v\n", job.id, job.pid, err)
+				job.issuccess = false
+				job.errormsg = err.Error()
+				return
+			}
+
+		} else if job.stream && job.dump {
+			// with stream over websocket and to disk file.
+			// construct the filename based on job submitted time and its id.
+			filenameSuffix := fmt.Sprintf("%02d%02d%02d.%s.txt", job.submittime.Year(), job.submittime.Month(), job.submittime.Day(), job.id)
+			job.filename = filepath.Join(Config.JobsOutputsFolder, filenameSuffix)
+			file, err := os.OpenFile(job.filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
+			if err != nil {
+				// cannot satisfy the output dumping so abort the process.
+				jobslog.Printf("[%s] [%05d] failed to create or open saving file for the job - errmsg: %v\n", job.id, job.pid, err)
+				job.endtime = time.Now().UTC()
+				job.iscompleted = true
+				jobslog.Printf("[%s] [%05d] error occured during the scheduling of the job - errmsg: %v\n", job.id, job.pid, err)
+				job.issuccess = false
+				job.errormsg = err.Error()
+				return
+			}
+			defer file.Close()
+			// duplicate the output stream for streaming to the disk file
+			// and keep the second pipe for user streaming over websocket.
+			outpipe, err := cmd.StdoutPipe()
+			if err != nil {
+				// job should be streaming so abort this job scheduling.
+				job.endtime = time.Now().UTC()
+				job.iscompleted = true
+				jobslog.Printf("[%s] [%05d] error occured during the scheduling of the job - errmsg: %v\n", job.id, job.pid, err)
+				job.issuccess = false
+				job.errormsg = err.Error()
+				return
+			}
+
+			job.outstream = io.TeeReader(outpipe, file)
+
+		} else if !job.stream && job.dump {
+			// only stream output to disk file. create/open file and use it as process pipe.
+			filenameSuffix := fmt.Sprintf("%02d%02d%02d.%s.txt", job.submittime.Year(), job.submittime.Month(), job.submittime.Day(), job.id)
+			job.filename = filepath.Join(Config.JobsOutputsFolder, filenameSuffix)
+			file, err := os.OpenFile(job.filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
+			if err != nil {
+				// cannot satisfy the output dumping so abort the process.
+				jobslog.Printf("[%s] [%05d] failed to create or open saving file for the job - errmsg: %v\n", job.id, job.pid, err)
+				job.endtime = time.Now().UTC()
+				job.iscompleted = true
+				jobslog.Printf("[%s] [%05d] error occured during the scheduling of the job - errmsg: %v\n", job.id, job.pid, err)
+				job.issuccess = false
+				job.errormsg = err.Error()
+				return
+			}
+			defer file.Close()
+			cmd.Stdout = file
+		} else {
+			// should not wanted but if happened, then set outputs to dev/null.
+			cmd.Stdout = nil
 		}
-	} else if job.islong && job.dump {
-		// long running job and user requested to save output to disk file.
-		// construct the filename based on job submitted time and its id.
-		filenameSuffix := fmt.Sprintf("%02d%02d%02d.%s.txt", job.submittime.Year(), job.submittime.Month(), job.submittime.Day(), job.id)
-		job.filename = filepath.Join(Config.JobsOutputsFolder, filenameSuffix)
-		file, err := os.OpenFile(job.filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
-		if err != nil {
-			// cannot satisfy the output dumping so abort the process.
-			jobslog.Printf("[%s] [%05d] failed to create or open saving file for the job - errmsg: %v\n", job.id, job.pid, err)
-			job.endtime = time.Now().UTC()
-			job.iscompleted = true
-			jobslog.Printf("[%s] [%05d] error occured during the scheduling of the job - errmsg: %v\n", job.id, job.pid, err)
-			job.issuccess = false
-			job.errormsg = err.Error()
-			return
-		}
-		defer file.Close()
-		// duplicate the output stream for streaming to the disk file and keep the second for user streaming.
-		outpipe, err := cmd.StdoutPipe()
-		if err != nil {
-			// job should be streaming so abort this job scheduling.
-			job.endtime = time.Now().UTC()
-			job.iscompleted = true
-			jobslog.Printf("[%s] [%05d] error occured during the scheduling of the job - errmsg: %v\n", job.id, job.pid, err)
-			job.issuccess = false
-			job.errormsg = err.Error()
-			return
-		}
-		job.outstream = io.TeeReader(outpipe, file)
+
 	} else {
-		// short running job so set the output to result memory buffer.
+		// short running job so redirect the output to <result memory buffer>.
 		cmd.Stdout = job.result
 	}
 
