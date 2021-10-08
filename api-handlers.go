@@ -16,7 +16,7 @@ func apiScheduleJobs(w http.ResponseWriter, r *http.Request) {
 
 	requestid := getFromRequest(r, "requestid")
 	if r.Method != "POST" {
-		SendErrorMessage(w, requestid, "Failed to schedule job(s). Invalid request method.", 405)
+		SendErrorMessage(w, requestid, "Failed to schedule job(s). Invalid request method.", http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -25,7 +25,7 @@ func apiScheduleJobs(w http.ResponseWriter, r *http.Request) {
 	// Decode the json list of jobs.
 	err = json.NewDecoder(r.Body).Decode(&data)
 	if err != nil {
-		SendErrorMessage(w, requestid, "Failed to schedule job(s). Invalid request content format.", 400)
+		SendErrorMessage(w, requestid, "Failed to schedule job(s). Invalid request content format. Make sure to fill all required fields.", http.StatusBadRequest)
 		return
 	}
 
@@ -33,7 +33,7 @@ func apiScheduleJobs(w http.ResponseWriter, r *http.Request) {
 
 	if len(jobs) == 0 {
 		// nothing submitted into request body.
-		SendErrorMessage(w, requestid, "Failed to schedule job(s). No jobs found in the resquest.", 400)
+		SendErrorMessage(w, requestid, "Failed to schedule job(s). No jobs found in the resquest.", http.StatusBadRequest)
 		return
 	}
 
@@ -114,7 +114,7 @@ func apiScheduleJobs(w http.ResponseWriter, r *http.Request) {
 
 	// send response data into json format.
 	w.Header().Set("Content-Type", "application/json;charset=UTF-8")
-	w.WriteHeader(200)
+	w.WriteHeader(http.StatusOK)
 	err = json.NewEncoder(w).Encode(ResponseJobsSchedule{RequestId: requestid, Jobs: finalJobsInfos})
 	if err != nil {
 		apilog.Printf("[request:%s] failed to send jobs scheduled infos - errmsg: %v\n", requestid, err)
@@ -130,7 +130,7 @@ func apiCheckJobsStatusById(w http.ResponseWriter, r *http.Request) {
 
 	requestid := getFromRequest(r, "requestid")
 	if r.Method != "GET" {
-		SendErrorMessage(w, requestid, "Failed to check job(s) status. Invalid request method.", 405)
+		SendErrorMessage(w, requestid, "Failed to check job(s) status. Invalid request method.", http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -138,14 +138,14 @@ func apiCheckJobsStatusById(w http.ResponseWriter, r *http.Request) {
 	ids, exist := query["id"]
 	if !exist || len(ids) == 0 {
 		// request does not contains query string id.
-		SendErrorMessage(w, requestid, "Failed to check job(s) status. Invalid request format or no jobs ids submitted.", 400)
+		SendErrorMessage(w, requestid, "Failed to check job(s) status. Invalid request format or no jobs ids submitted.", http.StatusBadRequest)
 		return
 	}
 
 	// cleanup user submitted list of jobs ids.
 	if ignore := removeDuplicateJobIds(&ids); ignore {
 		// no remaining good job id.
-		SendErrorMessage(w, requestid, "Failed to check job(s) status. The request sent does not contain any valid job id after verification.", 400)
+		SendErrorMessage(w, requestid, "Failed to check job(s) status. The request sent does not contain any valid job id after verification.", http.StatusBadRequest)
 		return
 	}
 
@@ -169,7 +169,7 @@ func apiCheckJobsStatusById(w http.ResponseWriter, r *http.Request) {
 
 	// send response data into json format.
 	w.Header().Set("Content-Type", "application/json;charset=UTF-8")
-	w.WriteHeader(200)
+	w.WriteHeader(http.StatusOK)
 	err := json.NewEncoder(w).Encode(ResponseCheckJobsStatus{RequestId: requestid, Infos: jobsStatusInfos, UnknownIds: unknownIds})
 	if err != nil {
 		apilog.Printf("[request:%s] failed to send jobs status - errmsg: %v\n", requestid, err)
@@ -185,7 +185,7 @@ func apiCheckAllJobsStatus(w http.ResponseWriter, r *http.Request) {
 
 	requestid := getFromRequest(r, "requestid")
 	if r.Method != "GET" {
-		SendErrorMessage(w, requestid, "Failed to check job(s) status. Invalid request method.", 405)
+		SendErrorMessage(w, requestid, "Failed to check job(s) status. Invalid request method.", http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -201,7 +201,7 @@ func apiCheckAllJobsStatus(w http.ResponseWriter, r *http.Request) {
 
 	// send response data into json format.
 	w.Header().Set("Content-Type", "application/json;charset=UTF-8")
-	w.WriteHeader(200)
+	w.WriteHeader(http.StatusOK)
 	err := json.NewEncoder(w).Encode(ResponseCheckJobsStatus{RequestId: requestid, Infos: jobsStatusInfos})
 	if err != nil {
 		apilog.Printf("[request:%s] failed to send all jobs status - errmsg: %v\n", requestid, err)
@@ -216,7 +216,7 @@ func apiFetchJobsOutputById(w http.ResponseWriter, r *http.Request) {
 
 	requestid := getFromRequest(r, "requestid")
 	if r.Method != "GET" {
-		SendErrorMessage(w, requestid, "Failed to fetch job output. Invalid request method.", 405)
+		SendErrorMessage(w, requestid, "Failed to fetch job output. Invalid request method.", http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -224,7 +224,7 @@ func apiFetchJobsOutputById(w http.ResponseWriter, r *http.Request) {
 	id := r.URL.Query().Get("id")
 	// make sure id provided matche - 16 hexa characters.
 	if match, _ := regexp.MatchString(`[a-z0-9]{16}`, id); !match {
-		SendErrorMessage(w, requestid, "Failed to fetch job output. Invalid job id.", 400)
+		SendErrorMessage(w, requestid, "Failed to fetch job output. Invalid job id.", http.StatusBadRequest)
 		return
 	}
 
@@ -233,12 +233,12 @@ func apiFetchJobsOutputById(w http.ResponseWriter, r *http.Request) {
 	job, exist := globalJobsResults[id]
 	mapLock.RUnlock()
 	if !exist {
-		SendErrorMessage(w, requestid, "Failed to fetch job output. Job id provided does not exits. Could have been removed or expired", 400)
+		SendErrorMessage(w, requestid, "Failed to fetch job output. Job id provided does not exits. Could have been removed or expired", 404)
 		return
 	}
 
 	if job.islong {
-		SendErrorMessage(w, requestid, "Failed to fetch job output. This job is a long running job. You must stream the output over websocket.", 400)
+		SendErrorMessage(w, requestid, "Failed to fetch job output. This job is a long running job. You must stream the output over websocket.", http.StatusBadRequest)
 		return
 	}
 
@@ -249,7 +249,7 @@ func apiFetchJobsOutputById(w http.ResponseWriter, r *http.Request) {
 
 	// send response data into json format.
 	w.Header().Set("Content-Type", "application/json;charset=UTF-8")
-	w.WriteHeader(200)
+	w.WriteHeader(http.StatusOK)
 	err := json.NewEncoder(w).Encode(ResponseFetchJobOutput{RequestId: requestid, Output: (job.result).String()})
 	if err != nil {
 		apilog.Printf("[request:%s] failed to send job output - errmsg: %v\n", requestid, err)
