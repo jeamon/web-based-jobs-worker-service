@@ -36,7 +36,7 @@ func setupWebServerRoutes(router *http.ServeMux) {
 	router.HandleFunc("/worker/web/v1/jobs/long/stream/schedule", scheduleLongJobsWithStreaming)
 	// schedule a long running job with only streaming output to disk file.
 	// /worker/web/v1/jobs/long/dump/schedule?cmd=<task>&cmd=<task>&timeout=<value>
-	// router.HandleFunc("/worker/web/v1/jobs/long/dump/schedule", scheduleLongJobsWithDumping)
+	router.HandleFunc("/worker/web/v1/jobs/long/dump/schedule", scheduleLongJobsWithDumping)
 }
 
 // setupApiGatewayRoutes configures apis routes.

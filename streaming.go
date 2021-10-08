@@ -1,8 +1,9 @@
 package main
 
+// @streaming.go contains handlers that provide websocket based.
+
 import (
 	"bufio"
-	"bytes"
 	"fmt"
 	"github.com/gorilla/websocket"
 	"io"
@@ -46,6 +47,7 @@ func serveStreamPage(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// isWebsocketRequest checks through a regex if a web request is websocket or not.
 func isWebsocketRequest(req *http.Request) bool {
 	return connectionUpgradeRegex.MatchString(strings.ToLower(req.Header.Get("Connection"))) && strings.ToLower(req.Header.Get("Upgrade")) == "websocket"
 }
@@ -78,6 +80,7 @@ func streamJobsOutputById(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// streamJob live streams over a given websocket a single job output.
 func streamJob(ws *websocket.Conn, id string) {
 	// verify existence of the job.
 	mapLock.RLock()
@@ -164,11 +167,11 @@ func streamJob(ws *websocket.Conn, id string) {
 }
 
 // scheduleLongJobsWithStreaming receives and schedules only long running jobs submitted by the user.
-// it automatically set the job data structure <islong> to true. if multiple jobs are submitted
-// into a single request then it ignores the query string <dump> so that the output will not be
-// saved on disk. Then will return a summary of jobs submitted. For a single submitted job, it
-// will set the <dump> to true or false if mentionned into the request query string. The default
-// value for <dump> field is false. Then it will redirect your browser to the streaming page.
+// it automatically set the job data structure <islong> and <stream >to true. if multiple jobs are
+// submitted then it ignores the query string <dump> so that the output will not be saved on disk.
+// Then will return a summary of jobs submitted. For a single submitted job, it will set the <dump>
+// to true or false if mentionned into the request query string. The default value for <dump> field
+// is false. Then it will redirect your browser to the streaming page.
 func scheduleLongJobsWithStreaming(w http.ResponseWriter, r *http.Request) {
 	// parse all query strings.
 	query := r.URL.Query()
@@ -177,7 +180,7 @@ func scheduleLongJobsWithStreaming(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf8")
 		// request does not contains query string cmd.
 		w.WriteHeader(400)
-		fmt.Fprintf(w, "\n[-] Sorry, the request submitted is malformed, go to http://<server-ip>:8080/ to view detailed help.")
+		fmt.Fprintf(w, "\n[+] Sorry, the request submitted is malformed. To view the documentation, go to https://"+Config.HttpsServerHost+":"+Config.HttpsServerPort+"/worker/web/v1/docs")
 		return
 	}
 	// default memory (megabytes) and cpu (percentage) limit values.
@@ -208,6 +211,8 @@ func scheduleLongJobsWithStreaming(w http.ResponseWriter, r *http.Request) {
 			pid:         0,
 			task:        cmds[0],
 			islong:      true,
+			stream:      true,
+			dump:        dump,
 			iscompleted: false,
 			issuccess:   false,
 			exitcode:    -1,
@@ -216,8 +221,6 @@ func scheduleLongJobsWithStreaming(w http.ResponseWriter, r *http.Request) {
 			stop:        make(chan struct{}, 1),
 			isstreaming: false,
 			lock:        &sync.RWMutex{},
-			result:      new(bytes.Buffer),
-			dump:        dump,
 			memlimit:    memlimit,
 			cpulimit:    cpulimit,
 			timeout:     timeout,
@@ -258,6 +261,8 @@ func scheduleLongJobsWithStreaming(w http.ResponseWriter, r *http.Request) {
 			pid:         0,
 			task:        cmd,
 			islong:      true,
+			stream:      true,
+			dump:        false,
 			iscompleted: false,
 			issuccess:   false,
 			exitcode:    -1,
@@ -266,8 +271,92 @@ func scheduleLongJobsWithStreaming(w http.ResponseWriter, r *http.Request) {
 			stop:        make(chan struct{}, 1),
 			isstreaming: false,
 			lock:        &sync.RWMutex{},
-			result:      new(bytes.Buffer),
-			dump:        false,
+			memlimit:    memlimit,
+			cpulimit:    cpulimit,
+			timeout:     timeout,
+			submittime:  time.Now().UTC(),
+			starttime:   time.Time{},
+			endtime:     time.Time{},
+		}
+		// register job to global map results so user can control it.
+		mapLock.Lock()
+		globalJobsResults[job.id] = job
+		mapLock.Unlock()
+		// add this job to the processing queue.
+		globalJobsQueue <- job
+		jobslog.Printf("[%s] [%05d] scheduled the processing of the job\n", job.id, job.pid)
+		// stream the added job details to user/client.
+		fmt.Fprintln(w, fmt.Sprintf("|%04d | %-18s | %-14d | %-10d | %-7d | %-20v | %-30s |", i+1, job.id, job.memlimit, job.cpulimit, job.timeout, (job.submittime).Format("2006-01-02 15:04:05"), truncateSyntax(job.task, 30)))
+		fmt.Fprintf(w, fmt.Sprintf("+%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+\n", Dashs(4), Dashs(18), Dashs(14), Dashs(10), Dashs(7), Dashs(20), Dashs(30)))
+		if ok {
+			f.Flush()
+		}
+	}
+}
+
+// scheduleLongJobsWithDumping receives and schedules only long running jobs submitted by the user.
+// It automatically set the job <islong> and <dump> fields to true and <stream> field to false.
+// Each job's output will be live streamed to a dedicated disk file named <jobid>.<submitime><.txt>
+func scheduleLongJobsWithDumping(w http.ResponseWriter, r *http.Request) {
+	// parse all query strings.
+	query := r.URL.Query()
+	cmds, exist := query["cmd"]
+	if !exist || len(cmds) == 0 {
+		w.Header().Set("Content-Type", "text/plain; charset=utf8")
+		// request does not contains query string cmd.
+		w.WriteHeader(400)
+		fmt.Fprintf(w, "\n[+] Sorry, the request submitted is malformed. To view the documentation, go to https://"+Config.HttpsServerHost+":"+Config.HttpsServerPort+"/worker/web/v1/docs")
+		return
+	}
+	// default memory (megabytes) and cpu (percentage) limit values.
+	memlimit := 100
+	cpulimit := 10
+	timeout := Config.LongJobTimeout
+	// extract only first value of mem and cpu query string.
+	if m, err := strconv.Atoi(query.Get("mem")); err == nil && m > 0 {
+		memlimit = m
+	}
+
+	if c, err := strconv.Atoi(query.Get("cpu")); err == nil && c > 0 {
+		cpulimit = c
+	}
+	// retreive timeout parameter value and consider it if higher than 0.
+	if t, err := strconv.Atoi(query.Get("timeout")); err == nil && t > 0 && t <= Config.LongJobTimeout {
+		timeout = t
+	}
+
+	// multiple jobs so schedule all of them and send summary.
+	// try to setup the response as not buffered data.
+	f, ok := w.(http.Flusher)
+	w.Header().Set("Content-Type", "text/plain; charset=utf8")
+	w.WriteHeader(200)
+	w.Write([]byte("\n[+] find below the details of the long running jobs (with output dump-only option) submitted\n\n"))
+
+	// format the display table.
+	title := fmt.Sprintf("|%-4s | %-18s | %-14s | %-10s | %-7s | %-20s | %-30s |", "Nb", "Job ID", "Memory [MB]", "CPU [%]", "Timeout", "Submitted At [UTC]", "Command Syntax")
+	fmt.Fprintln(w, strings.Repeat("=", len(title)))
+	fmt.Fprintln(w, title)
+	fmt.Fprintf(w, fmt.Sprintf("+%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+\n", Dashs(4), Dashs(18), Dashs(14), Dashs(10), Dashs(7), Dashs(20), Dashs(30)))
+	if ok {
+		f.Flush()
+	}
+	// build each job per command with resources limit values.
+	for i, cmd := range cmds {
+		job := &Job{
+			id:          generateID(),
+			pid:         0,
+			task:        cmd,
+			islong:      true,
+			stream:      false,
+			dump:        true,
+			iscompleted: false,
+			issuccess:   false,
+			exitcode:    -1,
+			errormsg:    "",
+			fetchcount:  0,
+			stop:        make(chan struct{}, 1),
+			isstreaming: false,
+			lock:        &sync.RWMutex{},
 			memlimit:    memlimit,
 			cpulimit:    cpulimit,
 			timeout:     timeout,
