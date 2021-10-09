@@ -106,11 +106,8 @@ func executeJob(job *Job, ctx context.Context) {
 			job.outpipe, err = cmd.StdoutPipe()
 			if err != nil {
 				// job should be streaming so abort this job scheduling.
-				job.endtime = time.Now().UTC()
-				job.iscompleted = true
 				jobslog.Printf("[%s] [%05d] error occured during the scheduling of the job - errmsg: %v\n", job.id, job.pid, err)
-				job.issuccess = false
-				job.errormsg = err.Error()
+				job.setFailedInfos(time.Now().UTC(), err.Error())
 				return
 			}
 
@@ -123,11 +120,8 @@ func executeJob(job *Job, ctx context.Context) {
 			if err != nil {
 				// cannot satisfy the output dumping so abort the process.
 				jobslog.Printf("[%s] [%05d] failed to create or open saving file for the job - errmsg: %v\n", job.id, job.pid, err)
-				job.endtime = time.Now().UTC()
-				job.iscompleted = true
 				jobslog.Printf("[%s] [%05d] error occured during the scheduling of the job - errmsg: %v\n", job.id, job.pid, err)
-				job.issuccess = false
-				job.errormsg = err.Error()
+				job.setFailedInfos(time.Now().UTC(), err.Error())
 				return
 			}
 			defer file.Close()
@@ -136,11 +130,9 @@ func executeJob(job *Job, ctx context.Context) {
 			outpipe, err := cmd.StdoutPipe()
 			if err != nil {
 				// job should be streaming so abort this job scheduling.
-				job.endtime = time.Now().UTC()
-				job.iscompleted = true
+				jobslog.Printf("[%s] [%05d] failed to get standard output pipe of the job - errmsg: %v\n", job.id, job.pid, err)
 				jobslog.Printf("[%s] [%05d] error occured during the scheduling of the job - errmsg: %v\n", job.id, job.pid, err)
-				job.issuccess = false
-				job.errormsg = err.Error()
+				job.setFailedInfos(time.Now().UTC(), err.Error())
 				return
 			}
 
@@ -154,11 +146,8 @@ func executeJob(job *Job, ctx context.Context) {
 			if err != nil {
 				// cannot satisfy the output dumping so abort the process.
 				jobslog.Printf("[%s] [%05d] failed to create or open saving file for the job - errmsg: %v\n", job.id, job.pid, err)
-				job.endtime = time.Now().UTC()
-				job.iscompleted = true
 				jobslog.Printf("[%s] [%05d] error occured during the scheduling of the job - errmsg: %v\n", job.id, job.pid, err)
-				job.issuccess = false
-				job.errormsg = err.Error()
+				job.setFailedInfos(time.Now().UTC(), err.Error())
 				return
 			}
 			defer file.Close()
@@ -176,11 +165,8 @@ func executeJob(job *Job, ctx context.Context) {
 	// asynchronously starting the job.
 	if err := cmd.Start(); err != nil {
 		// no need to continue - add job stats to map.
-		job.endtime = time.Now().UTC()
 		jobslog.Printf("[%s] [%05d] failed to start the job - errmsg: %v\n", job.id, job.pid, err)
-		job.issuccess = false
-		job.errormsg = err.Error()
-		job.iscompleted = true
+		job.setFailedInfos(time.Now().UTC(), err.Error())
 		return
 	}
 	// job process started.
