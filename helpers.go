@@ -260,3 +260,11 @@ func (job *Job) collectStatusInfos() JobStatusInfos {
 
 	return info
 }
+
+// setFailedInfos sets basics details for a completed or failed to start job.
+func (job *Job) setFailedInfos(t time.Time, e string) {
+	job.endtime = t
+	job.iscompleted = true
+	job.issuccess = false
+	job.errormsg = e
+}
