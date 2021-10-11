@@ -114,6 +114,7 @@ func createFolder(folderPath string) {
 
 // resetCompletedJobInfos resets a given job details (only if it has been completed/stopped before) for restarting.
 func (job *Job) resetCompletedJobInfos() {
+	job.lock.Lock()
 	job.pid = 0
 	job.iscompleted, job.issuccess = false, false
 	job.fetchcount = 0
@@ -122,6 +123,7 @@ func (job *Job) resetCompletedJobInfos() {
 	job.errormsg = ""
 	job.starttime, job.endtime = time.Time{}, time.Time{}
 	(job.result).Reset()
+	job.lock.Unlock()
 }
 
 // removeDuplicateJobIds rebuilds the slice of job ids (string type) by verifying the format and deleting
@@ -177,6 +179,7 @@ func SendErrorMessage(w http.ResponseWriter, requestid string, message string, c
 
 // scheduledInfos Job method to returns essential details once a job is just scheduled.
 func (job *Job) scheduledInfos() JobScheduledInfos {
+	job.lock.RLock()
 	info := JobScheduledInfos{
 		Id:         job.id,
 		Task:       job.task,
@@ -184,15 +187,26 @@ func (job *Job) scheduledInfos() JobScheduledInfos {
 		MemLimit:   job.memlimit,
 		CpuLimit:   job.cpulimit,
 		Timeout:    job.timeout,
+		Stream:     job.stream,
 		Dump:       job.dump,
 		SubmitTime: (job.submittime).Format("2006-01-02 15:04:05"),
 		StatusLink: fmt.Sprintf("https://%s:%s/worker/api/v1/jobs/status?id=%s", Config.HttpsServerHost, Config.HttpsServerPort, job.id),
 	}
+	job.lock.RUnlock()
 
 	if job.islong {
-		// long job must use websocket to stream output.
-		info.OutputLink = fmt.Sprintf("https://%s:%s/worker/web/v1/jobs/long/output/stream?id=%s", Config.HttpsServerHost, Config.HttpsServerPort, job.id)
+		if job.stream {
+			// long job with streaming capability.
+			info.OutputLink = fmt.Sprintf("https://%s:%s/worker/web/v1/jobs/long/output/stream?id=%s", Config.HttpsServerHost, Config.HttpsServerPort, job.id)
+		} else if job.dump {
+			// for long job with dump to file only option, we should download the file.
+			info.OutputLink = fmt.Sprintf("https://%s:%s/worker/web/v1/jobs/x/output/download?id=%s", Config.HttpsServerHost, Config.HttpsServerPort, job.id)
+		} else {
+			// long job with no web & file stream options -> /dev/null.
+			info.OutputLink = "n/a"
+		}
 	} else {
+		// short job.
 		info.OutputLink = fmt.Sprintf("https://%s:%s/worker/api/v1/jobs/fetch?id=%s", Config.HttpsServerHost, Config.HttpsServerPort, job.id)
 	}
 
@@ -202,7 +216,7 @@ func (job *Job) scheduledInfos() JobScheduledInfos {
 // collectStatusInfos Job method to returns full status details a job.
 func (job *Job) collectStatusInfos() JobStatusInfos {
 	var start, end, sizeFormat string
-
+	job.lock.RLock()
 	// format time display for zero time values.
 	if (job.starttime).IsZero() {
 		start = "N/A"
@@ -237,6 +251,7 @@ func (job *Job) collectStatusInfos() JobStatusInfos {
 		Pid:         job.pid,
 		Task:        job.task,
 		IsLong:      job.islong,
+		Stream:      job.stream,
 		Dump:        job.dump,
 		IsCompleted: job.iscompleted,
 		IsSuccess:   job.issuccess,
@@ -251,10 +266,21 @@ func (job *Job) collectStatusInfos() JobStatusInfos {
 		EndTime:     end,
 	}
 
+	job.lock.RUnlock()
+
 	if job.islong {
-		// long job must use websocket to stream output.
-		info.OutputLink = fmt.Sprintf("https://%s:%s/worker/web/v1/jobs/long/output/stream?id=%s", Config.HttpsServerHost, Config.HttpsServerPort, job.id)
+		if job.stream {
+			// long job with streaming capability.
+			info.OutputLink = fmt.Sprintf("https://%s:%s/worker/web/v1/jobs/long/output/stream?id=%s", Config.HttpsServerHost, Config.HttpsServerPort, job.id)
+		} else if job.dump {
+			// for long job with dump to file only option, we should download the file.
+			info.OutputLink = fmt.Sprintf("https://%s:%s/worker/web/v1/jobs/x/output/download?id=%s", Config.HttpsServerHost, Config.HttpsServerPort, job.id)
+		} else {
+			// long job with no web & file stream options -> /dev/null.
+			info.OutputLink = "n/a"
+		}
 	} else {
+		// short job.
 		info.OutputLink = fmt.Sprintf("https://%s:%s/worker/api/v1/jobs/fetch?id=%s", Config.HttpsServerHost, Config.HttpsServerPort, job.id)
 	}
 
@@ -263,8 +289,10 @@ func (job *Job) collectStatusInfos() JobStatusInfos {
 
 // setFailedInfos sets basics details for a completed or failed to start job.
 func (job *Job) setFailedInfos(t time.Time, e string) {
+	job.lock.Lock()
 	job.endtime = t
 	job.iscompleted = true
 	job.issuccess = false
 	job.errormsg = e
+	job.lock.Unlock()
 }
