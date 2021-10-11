@@ -31,6 +31,8 @@ func setupWebServerRoutes(router *http.ServeMux) {
 	router.HandleFunc("/worker/web/v1/jobs/x/restart/all", restartAllJobs)
 	// live streaming a long running job output: /worker/web/v1/jobs/long/output/stream?id=<jobid>
 	router.HandleFunc("/worker/web/v1/jobs/long/output/stream", streamJobsOutputById)
+	// download a job output file: /worker/web/v1/jobs/x/output/download?id=<jobid>
+	router.HandleFunc("/worker/web/v1/jobs/x/output/download", downloadJobsOutputById)
 	// schedule a long running job with output streaming capability.
 	// /worker/web/v1/jobs/long/stream/schedule?cmd=<task>&cmd=<task>&timeout=<value>&save=true|false
 	router.HandleFunc("/worker/web/v1/jobs/long/stream/schedule", scheduleLongJobsWithStreaming)

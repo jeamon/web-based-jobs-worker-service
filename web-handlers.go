@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"runtime"
 	"sort"
@@ -356,7 +357,7 @@ func getJobsOutputById(w http.ResponseWriter, r *http.Request) {
 	job.lock.Unlock()
 	// job present - send the result field data.
 	w.WriteHeader(200)
-	fmt.Fprintln(w, fmt.Sprintf("Hello • Find below the result of Job ID [%s]", (*job).id))
+	fmt.Fprintln(w, fmt.Sprintf("Hello • Find below the result of Job ID [%s]", job.id))
 	fmt.Fprintln(w, (job.result).String())
 	return
 }
@@ -690,4 +691,73 @@ func restartAllJobs(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	mapLock.Unlock()
+}
+
+// downloadJobsOutputById loads and sends job output saved into file.
+// GET /worker/web/v1/jobs/x/output/download?id=<jobid>
+func downloadJobsOutputById(w http.ResponseWriter, r *http.Request) {
+
+	w.Header().Set("Content-Type", "text/plain; charset=utf8")
+
+	// expect one value for the query - if multiple passed only first will be returned.
+	id := r.URL.Query().Get("id")
+	// make sure id provided matche - 16 hexa characters.
+	if match, _ := regexp.MatchString(`[a-z0-9]{16}`, id); !match {
+		w.WriteHeader(400)
+		fmt.Fprintln(w, "Sorry, the Job ID provided is invalid.")
+		return
+	}
+
+	// get read lock and verify existence of job into the results map.
+	mapLock.RLock()
+	job, exist := globalJobsResults[id]
+	mapLock.RUnlock()
+	if !exist {
+		w.WriteHeader(404)
+		fmt.Fprintln(w, fmt.Sprintf("\n[-] Job ID [%s] does not exist - could have been removed or expired", id))
+		return
+	}
+
+	// get the output file  path to download.
+	var outputFilePath string
+	if job.islong && job.dump && len(job.filename) != 0 {
+		outputFilePath = job.filename
+	} else {
+		// construct based on built-in formula used into controllers.go / executeJob().
+		filenameSuffix := fmt.Sprintf("%02d%02d%02d.%s.txt", job.submittime.Year(), job.submittime.Month(), job.submittime.Day(), job.id)
+		outputFilePath = filepath.Join(Config.JobsOutputsFolder, filenameSuffix)
+	}
+
+	file, err := os.Open(outputFilePath)
+	if err != nil {
+		http.Error(w, "Sorry, the output file of this job was not found.", http.StatusNotFound)
+		return
+	}
+	defer file.Close()
+
+	fileInfos, err := file.Stat()
+	if err != nil {
+		http.Error(w, "Sorry, cannot download the file. failed to load the file details.", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(200)
+
+	// disable caching.
+	w.Header().Set("Cache-Control", "no-cache,no-store,max-age=0,must-revalidate")
+	w.Header().Set("Content-Control", "private, no-transform, no-store, must-revalidate")
+	w.Header().Set("Pragma", "no-cache") // HTTP1.0 compatibility.
+	w.Header().Set("Expires", "-1")
+
+	// send file for downloading.
+	attachment := fmt.Sprintf("attachment; filename=%s", filepath.Base(outputFilePath))
+	w.Header().Set("Content-Disposition", attachment)
+	w.Header().Set("Content-Type", "text/plain")
+	w.Header().Set("Content-Length", strconv.FormatInt(fileInfos.Size(), 10))
+	http.ServeContent(w, r, file.Name(), fileInfos.ModTime(), file)
+
+	// increment number of the job result calls.
+	job.lock.Lock()
+	job.fetchcount += 1
+	job.lock.Unlock()
 }
