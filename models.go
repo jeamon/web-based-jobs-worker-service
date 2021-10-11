@@ -115,6 +115,7 @@ type JobScheduledInfos struct {
 	MemLimit   int    `json:"memlimit"`
 	CpuLimit   int    `json:"cpulimit"`
 	Timeout    int    `json:"timeout"`
+	Stream     bool   `json:"stream"`
 	Dump       bool   `json:"dump"`
 	SubmitTime string `json:"submittime"`
 	StatusLink string `json:"statuslink"`
@@ -141,6 +142,7 @@ type JobStatusInfos struct {
 	MemLimit    int    `json:"memlimit"`
 	CpuLimit    int    `json:"cpulimit"`
 	Timeout     int    `json:"timeout"`
+	Stream      bool   `json:"stream"`
 	Dump        bool   `json:"dump"`
 	SubmitTime  string `json:"submittime"`
 	StartTime   string `json:"starttime"`

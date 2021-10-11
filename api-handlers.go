@@ -59,6 +59,11 @@ func apiScheduleJobs(w http.ResponseWriter, r *http.Request) {
 				timeout = Config.ShortJobTimeout
 			}
 
+			if jobInfos.Stream {
+				// fix the mistake. stream is for long job.
+				jobInfos.Stream = false
+			}
+
 			if jobInfos.Dump {
 				// fix the mistake. dump is for long job.
 				jobInfos.Dump = false
@@ -82,6 +87,8 @@ func apiScheduleJobs(w http.ResponseWriter, r *http.Request) {
 			pid:         0,
 			task:        jobInfos.Task,
 			islong:      jobInfos.IsLong,
+			stream:      jobInfos.Stream,
+			dump:        jobInfos.Dump,
 			iscompleted: false,
 			issuccess:   false,
 			exitcode:    -1,
@@ -89,7 +96,6 @@ func apiScheduleJobs(w http.ResponseWriter, r *http.Request) {
 			fetchcount:  0,
 			stop:        make(chan struct{}, 1),
 			lock:        &sync.RWMutex{},
-			dump:        jobInfos.Dump,
 			memlimit:    memlimit,
 			cpulimit:    cpulimit,
 			timeout:     timeout,
@@ -240,16 +246,17 @@ func apiFetchJobsOutputById(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if job.islong {
-		SendErrorMessage(w, requestid, "Failed to fetch job output. This job is a long running job. You must stream the output over websocket.", http.StatusBadRequest)
+		if job.stream {
+			SendErrorMessage(w, requestid, "Failed to fetch job output. This job is a long running job with streaming capability. You must stream the output over a websocket.", http.StatusBadRequest)
+		} else if job.dump {
+			SendErrorMessage(w, requestid, "Failed to fetch job output. This job is a long running job with dump to file capability. You must download the output file.", http.StatusBadRequest)
+		} else {
+			SendErrorMessage(w, requestid, "Failed to fetch job output. This job was scheduled with not output saving option. There is no way to fetch its output.", http.StatusBadRequest)
+		}
 		return
 	}
 
-	// increment number of the job result calls.
-	job.lock.Lock()
-	job.fetchcount += 1
-	job.lock.Unlock()
-
-	// send response data into json format.
+	// short job, so build and send response data into json format.
 	w.Header().Set("Content-Type", "application/json;charset=UTF-8")
 	w.WriteHeader(http.StatusOK)
 	err := json.NewEncoder(w).Encode(ResponseFetchJobOutput{RequestId: requestid, Output: (job.result).String()})
@@ -258,5 +265,9 @@ func apiFetchJobsOutputById(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// increment number of the job result calls.
+	job.lock.Lock()
+	job.fetchcount += 1
+	job.lock.Unlock()
 	apilog.Printf("[request:%s] success to send job output\n", requestid)
 }
