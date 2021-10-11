@@ -170,7 +170,9 @@ func executeJob(job *Job, ctx context.Context) {
 		return
 	}
 	// job process started.
+	job.lock.Lock()
 	job.pid = cmd.Process.Pid
+	job.lock.Unlock()
 	jobslog.Printf("[%s] [%05d] started the processing of the job\n", job.id, job.pid)
 	// var err error
 	done := make(chan error)
@@ -222,15 +224,18 @@ func executeJob(job *Job, ctx context.Context) {
 		// task completed before timeout. exit from select loop.
 		break
 	}
-
+	job.lock.Lock()
 	job.iscompleted = true
 	job.endtime = time.Now().UTC()
+	job.lock.Unlock()
 
 	if err != nil {
 		// timeout not reached - but an error occured during execution
 		jobslog.Printf("[%s] [%05d] error occured during the processing of the job - errmsg: %v\n", job.id, job.pid, err)
+		job.lock.Lock()
 		job.issuccess = false
 		job.errormsg = err.Error()
+		job.lock.Unlock()
 		// lets get the exit code.
 		if exitError, ok := err.(*exec.ExitError); ok {
 			ws := exitError.Sys().(syscall.WaitStatus)
@@ -238,19 +243,23 @@ func executeJob(job *Job, ctx context.Context) {
 		}
 	}
 
-	if err == nil && !stopped {
-		// exited from select loop due to other reason than job stop request.
-		jobslog.Printf("[%s] [%05d] completed the processing of the job\n", job.id, job.pid)
+	if err == nil {
+		// job completed without error.
+		job.lock.Lock()
 		job.issuccess = true
-		// success, exitCode should be 0
-		ws := cmd.ProcessState.Sys().(syscall.WaitStatus)
-		job.exitcode = ws.ExitStatus()
-	}
-
-	if err == nil && stopped {
-		// exited from select loop due to job stop request.
-		jobslog.Printf("[%s] [%05d] stopped the processing of the job\n", job.id, job.pid)
-		job.issuccess = true
-		// no exit code for killed process - lets leave it to -1 for reference.
+		job.lock.Unlock()
+		if !stopped {
+			// exited from select loop due to other reason than job stop request.
+			jobslog.Printf("[%s] [%05d] completed the processing of the job\n", job.id, job.pid)
+			// success, exitCode should be 0
+			ws := cmd.ProcessState.Sys().(syscall.WaitStatus)
+			job.lock.Lock()
+			job.exitcode = ws.ExitStatus()
+			job.lock.Unlock()
+		} else {
+			// job completed with stop request.
+			jobslog.Printf("[%s] [%05d] stopped the processing of the job\n", job.id, job.pid)
+			// no exit code for killed process - we leave it to default (-1) for reference.
+		}
 	}
 }

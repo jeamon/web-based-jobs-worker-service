@@ -93,11 +93,14 @@ func streamJob(ws *websocket.Conn, id string) {
 		return
 	}
 
+	job.lock.RLock()
 	if job.iscompleted {
+		job.lock.RUnlock()
 		// job already finished, pull the result rather than stream.
 		ws.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("\nSorry, the job []%s] is no longer running - you can check its status.", id)))
 		return
 	}
+	job.lock.RUnlock()
 
 	if !job.islong {
 		// job is not a long running task for stream, pull the result rather than stream.
@@ -107,7 +110,7 @@ func streamJob(ws *websocket.Conn, id string) {
 
 	job.lock.RLock()
 	if job.isstreaming {
-		defer job.lock.RUnlock()
+		job.lock.RUnlock()
 		// job output streaming is already being consumed.
 		ws.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("\nThe job output stream is already being consumed. Only one live streaming at a moment or you can stop the job.")))
 		return
