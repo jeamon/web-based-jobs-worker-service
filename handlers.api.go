@@ -1,6 +1,6 @@
 package main
 
-// @api-handlers.go contains functions that directly handle each restful api calls.
+// @handlers.api.go contains functions that directly handle each restful api calls.
 
 import (
 	"bytes"
