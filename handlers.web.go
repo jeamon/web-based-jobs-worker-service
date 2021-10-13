@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"os/exec"
@@ -693,18 +694,20 @@ func restartAllJobs(w http.ResponseWriter, r *http.Request) {
 	mapLock.Unlock()
 }
 
-// downloadJobsOutputById loads and sends job output saved into file.
+// downloadJobsOutputById check if id provided belong to a long job which has dump option enabled.
+// then loads from disk its output file and for downloading. In case the id belongs to a short job,
+// it is ignored because by design short job output is saved into memory buffer. This means if a short
+// job has been deleted due to max age or by request, its output dump is just a backup and you will
+// need to manually pull it from the server (reach out to the backend administrator for that purpose).
 // GET /worker/web/v1/jobs/x/output/download?id=<jobid>
 func downloadJobsOutputById(w http.ResponseWriter, r *http.Request) {
-
 	w.Header().Set("Content-Type", "text/plain; charset=utf8")
-
 	// expect one value for the query - if multiple passed only first will be returned.
 	id := r.URL.Query().Get("id")
 	// make sure id provided matche - 16 hexa characters.
 	if match, _ := regexp.MatchString(`[a-z0-9]{16}`, id); !match {
-		w.WriteHeader(400)
-		fmt.Fprintln(w, "Sorry, the Job ID provided is invalid.")
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprintln(w, fmt.Sprintf("Sorry, the Job ID [%s] provided is invalid.", id))
 		return
 	}
 
@@ -713,14 +716,25 @@ func downloadJobsOutputById(w http.ResponseWriter, r *http.Request) {
 	job, exist := globalJobsResults[id]
 	mapLock.RUnlock()
 	if !exist {
-		w.WriteHeader(404)
-		fmt.Fprintln(w, fmt.Sprintf("\n[-] Job ID [%s] does not exist - could have been removed or expired", id))
+		w.WriteHeader(http.StatusNotFound)
+		fmt.Fprintln(w, fmt.Sprintf("\nSorry, this job ID [%s] does not exist. could have been removed or expired.", id))
 		return
+	}
+
+	if !job.islong {
+		// short job has output in buffer memory.
+		fmt.Fprintln(w, fmt.Sprintf("\nSorry, this job ID [%s] belongs to a short job. Fetch its output directly from its buffer memory.", id))
+		return
+	}
+
+	if !job.dump {
+		// long job without dump option, so there is no file to load.
+		fmt.Fprintln(w, fmt.Sprintf("\nSorry, this job ID [%s] belongs to a long job without dump option. There is no file to download.", id))
 	}
 
 	// get the output file  path to download.
 	var outputFilePath string
-	if job.islong && job.dump && len(job.filename) != 0 {
+	if len(job.filename) != 0 {
 		outputFilePath = job.filename
 	} else {
 		// construct based on built-in formula used into controllers.go / executeJob().
@@ -730,32 +744,32 @@ func downloadJobsOutputById(w http.ResponseWriter, r *http.Request) {
 
 	file, err := os.Open(outputFilePath)
 	if err != nil {
-		http.Error(w, "Sorry, the output file of this job was not found.", http.StatusNotFound)
+		w.WriteHeader(http.StatusNotFound)
+		fmt.Fprintf(w, fmt.Sprintf("Sorry, the output file of this job was not found. Check inside the <%s> folder on the server if it is present.", Config.JobsOutputsFolder))
+		log.Printf("failed to download job ID [%s] output file. cannot find dump file - errmsg: %v\n", id, err)
 		return
 	}
 	defer file.Close()
 
 	fileInfos, err := file.Stat()
 	if err != nil {
-		http.Error(w, "Sorry, cannot download the file. failed to load the file details.", http.StatusInternalServerError)
+		w.WriteHeader(http.StatusInternalServerError)
+		log.Printf("failed to download job ID [%s] output file. cannot get dump file details - errmsg: %v\n", id, err)
 		return
 	}
 
 	w.WriteHeader(200)
-
 	// disable caching.
 	w.Header().Set("Cache-Control", "no-cache,no-store,max-age=0,must-revalidate")
 	w.Header().Set("Content-Control", "private, no-transform, no-store, must-revalidate")
 	w.Header().Set("Pragma", "no-cache") // HTTP1.0 compatibility.
 	w.Header().Set("Expires", "-1")
-
 	// send file for downloading.
 	attachment := fmt.Sprintf("attachment; filename=%s", filepath.Base(outputFilePath))
 	w.Header().Set("Content-Disposition", attachment)
 	w.Header().Set("Content-Type", "text/plain")
 	w.Header().Set("Content-Length", strconv.FormatInt(fileInfos.Size(), 10))
 	http.ServeContent(w, r, file.Name(), fileInfos.ModTime(), file)
-
 	// increment number of the job result calls.
 	job.lock.Lock()
 	job.fetchcount += 1
