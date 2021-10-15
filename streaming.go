@@ -35,10 +35,30 @@ func serveStreamPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// retrieve and setup foreground text color to use.
+	fgcolor := r.URL.Query().Get("fg")
+	if len(fgcolor) == 0 {
+		fgcolor = Config.StreamPageDefaultForegroundColor
+	}
+	// retrieve and setup background page color to use.
+	bgcolor := r.URL.Query().Get("bg")
+	if len(bgcolor) == 0 {
+		bgcolor = Config.StreamPageDefaultBackgroundColor
+	}
+	// retrieve and setup background page color to use.
+	bold := false
+	wantBold := r.URL.Query().Get("bold")
+	if strings.ToLower(wantBold) == "true" {
+		bold = true
+	}
+
 	w.Header().Set("Content-Type", "text/html; charset=utf8")
 	info := map[string]interface{}{
-		"id":     id,
-		"server": r.Host,
+		"id":      id,
+		"server":  r.Host,
+		"fgcolor": fgcolor,
+		"bgcolor": bgcolor,
+		"bold":    bold,
 	}
 	err := tmpl.Execute(w, info)
 	if err != nil {

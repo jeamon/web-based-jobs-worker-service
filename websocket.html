@@ -6,7 +6,11 @@
     <meta http-equiv="X-UA-Compatible" content="ie=edge" />
     <title>streaming job id {{.id}}</title>
   </head>
-  <body style="background: black; color: white;">
+  {{if .bold}}  
+  <body style="font-weight: bold; background: {{.bgcolor}}; color: {{.fgcolor}};">
+  {{else}}
+  <body style="background: {{.bgcolor}}; color: {{.fgcolor}};">
+  {{end}}
     <pre>Real-time combined output of job id [{{.id}}]</pre>
     <pre id="output"></pre>
     <script type="text/javascript">
