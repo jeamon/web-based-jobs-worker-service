@@ -10,6 +10,47 @@ import (
 	"os"
 )
 
+// Configuation is the structure of the expected json data to be loaded from the config file <worker.config.json>.
+type Configuration struct {
+	HttpsServerHost             string `json:"https_server_host"`              // https server ip or dns.
+	HttpsServerPort             string `json:"https_server_port"`              // https server port number.
+	HttpsServerCerts            string `json:"https_server_certs"`             // https server certificate filename.
+	HttpsServerKey              string `json:"https_server_key"`               // https server private key filename.
+	HttpsServerCertsPath        string `json:"https_server_certs_path"`        // where to find https server certs/key.
+	HttpsServerCertsEmail       string `json:"https_server_certs_email"`       // email to use when building server certs.
+	WorkerPidFilePath           string `json:"worker_pid_file_path"`           // worker service process identifier file.
+	WorkerLogFilePath           string `json:"worker_log_file_path"`           // place to store worker process outputs.
+	LogFoldersLocation          string `json:"log_folders_location"`           // folder to store daily startup logs.
+	WebRequestsLogFile          string `json:"web_requests_log_file"`          // file to create and storing all web requests.
+	ApiRequestsLogFile          string `json:"api_requests_log_file"`          // file to create for storing all api calls.
+	JobsProcessLogFile          string `json:"jobs_process_log_file"`          // file to create for storing jobs processing lifecycle.
+	JobsDeletionLogFile         string `json:"jobs_deletion_log_file"`         // file to create for tracking auto-deleted jobs details.
+	DefaultLinuxShell           string `json:"default_linux_shell"`            // shell path to be used on linux platform as last resort.
+	JobsOutputsFolder           string `json:"jobs_outputs_folder"`            // folder to create for storing long jobs outputs dump.
+	WorkerWorkingDirectory      string `json:"worker_working_directory"`       // path to be used as worker process directory.
+	JobsCleanupMaxFetch         int    `json:"jobs_cleanup_max_fetch"`         // maximum number of output fetch to allow job deletion.
+	JobsCleanupRunInterval      int    `json:"jobs_cleanup_run_interval"`      // each number of hours to check for jobs deletion.
+	JobsCleanupMaxAge           int    `json:"jobs_cleanup_max_age"`           // hours since job ended to consider as dead job to delete.
+	WaitTimeBeforeExit          int    `json:"wait_time_before_exit"`          // seconds to pause before exiting from the worker.
+	ShortJobTimeout             int    `json:"short_job_timeout"`              // default and max timeout in seconds for short running jobs.
+	LongJobTimeout              int    `json:"long_job_timeout"`               // default and max timeout in minutes for long running jobs.
+	MaxJobsQueueBuffer          int    `json:"max_jobs_queue_buffer"`          // maximum jobs to queue at once on channel for pickup.
+	PidFileWatchInterval        int    `json:"pid_file_watch_interval"`        // each number of mins to check the pidfile presence before self-shutdown.
+	EnableWebAccess             bool   `json:"enable_web_access"`              // specifies if web routes should be setup or not.
+	EnableAPIGateway            bool   `json:"enable_api_gateway"`             // specifies if api routes should be setup or not.
+	MaxNumberOfJobs             int    `json:"max_number_of_jobs"`             // maximum number of jobs that could be processed.
+	OrganizationNameForCerts    string `json:"organization_name_for_certs"`    // Organization name to be used for self-signed CA.
+	CountryCodeForCerts         string `json:"country_code_for_certs"`         // Country code to be used for self-signed certificate.
+	ProvinceNameForCerts        string `json:"province_name_for_certs"`        // Province name to be used for self-signed certificate.
+	CityNameForCerts            string `json:"city_name_for_certs"`            // City name to be used for self-signed certificate.
+	StreetAddressForCerts       string `json:"street_address_for_certs"`       // Street name to be used for self-signed certificate.
+	PostalCodeForCerts          string `json:"postal_code_for_certs"`          // Postal code to be used for self-signed certificate.
+	MemoryLimitMaxMegaBytes     int    `json:"memory_limit_max_megabytes"`     // maximum memory usage for any job process in megabytes.
+	MemoryLimitDefaultMegaBytes int    `json:"memory_limit_default_megabytes"` // default memory usage for any job process in megabytes.
+	CpuLimitDefaultPercentage   int    `json:"cpu_limit_default_percentage"`   // default cpu usage for any job process in percentage.
+	CpuLimitMaxPercentage       int    `json:"cpu_limit_max_percentage"`       // maximum cpu usage for any job process in percentage.
+}
+
 // config filename to be used to setup the worker service.
 var DefaultConfigFile = "worker.config.json"
 
