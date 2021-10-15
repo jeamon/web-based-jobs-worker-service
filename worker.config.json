@@ -35,5 +35,7 @@
 	"memory_limit_max_megabytes": 1000,
 	"memory_limit_default_megabytes": 100,
 	"cpu_limit_default_percentage": 10,
-	"cpu_limit_max_percentage": 25
+	"cpu_limit_max_percentage": 25,
+	"stream_page_default_foreground_color": "white",
+	"stream_page_default_background_color": "black"
 }
