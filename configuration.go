@@ -51,6 +51,7 @@ type Configuration struct {
 	CpuLimitMaxPercentage            int    `json:"cpu_limit_max_percentage"`             // maximum cpu usage for any job process in percentage.
 	StreamPageDefaultForegroundColor string `json:"stream_page_default_foreground_color"` // if text color not set in stream request use this.
 	StreamPageDefaultBackgroundColor string `json:"stream_page_default_background_color"` // if page background color not set in stream request use this.
+	StreamPageDefaultFontSize        int    `json:"stream_page_default_font_size"`        // if page font size not set in stream request use this.
 }
 
 // config filename to be used to setup the worker service.
@@ -101,6 +102,7 @@ var defaultConfig = Configuration{
 	CpuLimitMaxPercentage:            25,
 	StreamPageDefaultForegroundColor: "white",
 	StreamPageDefaultBackgroundColor: "black",
+	StreamPageDefaultFontSize:        18,
 }
 
 // dumpDefaultConfig is triggered when passed config file is not found or erroned. It loads

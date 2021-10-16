@@ -37,5 +37,6 @@
 	"cpu_limit_default_percentage": 10,
 	"cpu_limit_max_percentage": 25,
 	"stream_page_default_foreground_color": "white",
-	"stream_page_default_background_color": "black"
+	"stream_page_default_background_color": "black",
+	"stream_page_default_font_size": 18
 }
