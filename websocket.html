@@ -7,9 +7,9 @@
     <title>streaming job id {{.id}}</title>
   </head>
   {{if .bold}}  
-  <body style="font-weight: bold; background: {{.bgcolor}}; color: {{.fgcolor}};">
+  <body style="font-weight: bold; font-size: {{.size}}px; background-color: {{.bgcolor}}; color: {{.fgcolor}};">
   {{else}}
-  <body style="background: {{.bgcolor}}; color: {{.fgcolor}};">
+  <body style="font-size: {{.size}}px; background-color: {{.bgcolor}}; color: {{.fgcolor}};">
   {{end}}
     <pre>Real-time combined output of job id [{{.id}}]</pre>
     <pre id="output"></pre>

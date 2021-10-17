@@ -45,11 +45,17 @@ func serveStreamPage(w http.ResponseWriter, r *http.Request) {
 	if len(bgcolor) == 0 {
 		bgcolor = Config.StreamPageDefaultBackgroundColor
 	}
-	// retrieve and setup background page color to use.
+	// retrieve and setup page text font size.
 	bold := false
-	wantBold := r.URL.Query().Get("bold")
-	if strings.ToLower(wantBold) == "true" {
+	if strings.ToLower(r.URL.Query().Get("bold")) == "true" {
 		bold = true
+	}
+
+	// setup streaming page text size. user submitted size
+	// should be higher than 16px and less than 24px.
+	fontSize := Config.StreamPageDefaultFontSize
+	if size, err := strconv.Atoi(r.URL.Query().Get("size")); err == nil && size >= 16 && size <= 24 {
+		fontSize = size
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf8")
@@ -59,6 +65,7 @@ func serveStreamPage(w http.ResponseWriter, r *http.Request) {
 		"fgcolor": fgcolor,
 		"bgcolor": bgcolor,
 		"bold":    bold,
+		"size":    fontSize,
 	}
 	err := tmpl.Execute(w, info)
 	if err != nil {
@@ -192,9 +199,11 @@ func streamJob(ws *websocket.Conn, id string) {
 // scheduleLongJobsWithStreaming receives and schedules only long running jobs submitted by the user.
 // it automatically set the job data structure <islong> and <stream >to true. if multiple jobs are
 // submitted then it ignores the query string <dump> so that the output will not be saved on disk.
-// Then will return a summary of jobs submitted. For a single submitted job, it will set the <dump>
-// to true or false if mentionned into the request query string. The default value for <dump> field
-// is false. Then it will redirect your browser to the streaming page.
+// Then will return a summary of jobs submitted. If the request consists of a single job, it will set
+// the <dump> to true or false if mentionned into the request query string. The default value for <dump>
+// field is false. Then it will redirect your browser to the streaming page. If foreground and background
+// colors and font size values are specified, these will be taken into account.
+//
 func scheduleLongJobsWithStreaming(w http.ResponseWriter, r *http.Request) {
 	// parse all query strings.
 	query := r.URL.Query()
@@ -211,6 +220,7 @@ func scheduleLongJobsWithStreaming(w http.ResponseWriter, r *http.Request) {
 	cpulimit := Config.CpuLimitDefaultPercentage
 	timeout := Config.LongJobTimeout
 	dump := false
+
 	// extract only first value of mem and cpu query string. they cannot be greater than maximum values.
 	if m, err := strconv.Atoi(query.Get("mem")); err == nil && m > 0 && m <= Config.MemoryLimitMaxMegaBytes {
 		memlimit = m
@@ -229,6 +239,29 @@ func scheduleLongJobsWithStreaming(w http.ResponseWriter, r *http.Request) {
 		if d := query.Get("dump"); strings.ToLower(d) == "true" {
 			dump = true
 		}
+		// setup streaming page text color.
+		fgcolor := query.Get("fg")
+		if len(fgcolor) == 0 {
+			fgcolor = Config.StreamPageDefaultForegroundColor
+		}
+		// setup streaming page background color.
+		bgcolor := query.Get("bg")
+		if len(bgcolor) == 0 {
+			bgcolor = Config.StreamPageDefaultBackgroundColor
+		}
+		// setup streaming page font weight (normal or bold).
+		bold := "false"
+		if strings.ToLower(query.Get("bold")) == "true" {
+			bold = "true"
+		}
+
+		// setup streaming page text size. user submitted size
+		// should be higher than 16px and less than 24px.
+		fontSize := Config.StreamPageDefaultFontSize
+		if size, err := strconv.Atoi(query.Get("size")); err == nil && size >= 16 && size <= 24 {
+			fontSize = size
+		}
+
 		job := &Job{
 			id:          generateID(),
 			pid:         0,
@@ -258,7 +291,7 @@ func scheduleLongJobsWithStreaming(w http.ResponseWriter, r *http.Request) {
 		// add this job to the processing queue.
 		globalJobsQueue <- job
 		jobslog.Printf("[%s] [%05d] scheduled the processing of the job\n", job.id, job.pid)
-		http.Redirect(w, r, fmt.Sprintf("https://%s/worker/web/v1/jobs/long/output/stream?id=%s", r.Host, job.id), http.StatusMovedPermanently)
+		http.Redirect(w, r, fmt.Sprintf("https://%s/worker/web/v1/jobs/long/output/stream?id=%s&fg=%s&bg=%s&bold=%s&size=%d", r.Host, job.id, fgcolor, bgcolor, bold, fontSize), http.StatusMovedPermanently)
 		return
 	}
 
