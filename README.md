@@ -65,6 +65,7 @@ Below is a summary of available features. This section will be updated as projec
 * restful apis to schedule multiple jobs and check their status and fetch their output
 * dump max-aged jobs output to disk file before deleting them from the result map
 * tag each web or api request/call with a unique request id for tracing & debugging
+* user-defined foreground & background colors & font-size & font-weight of streaming web page
 
 
 Please feel free to have a look at the [usage section](#usage) for examples.
@@ -179,10 +180,11 @@ $ docker run -d --publish 8080:8080 --name unix-worker --rm unix-worker /bin/sh 
 	```
 
 
-* To execute multiple long running remote task (optionally with timeout in mins) and use their ids to stream their realtime outputs:
+* To execute multiple long running remote task (optionally with timeout in mins and stream page style) and use their ids to stream their realtime outputs:
 	
 	```
 	https://<server-ip-address>:<port>/worker/web/v1/jobs/long/stream/schedule?cmd=<command+argument>&cmd=<command+argument>&timeout=<value>
+	&fg=<foreground-color>&bg=<background-color>&bold=[true|false]&size=<value>
 	```
 	
 	[+] On Windows Operating System.
@@ -198,15 +200,16 @@ $ docker run -d --publish 8080:8080 --name unix-worker --rm unix-worker /bin/sh 
 	```
 
 
-* To stream the output of a single long running job by its id:
+* To stream the output of a single long running job by its id (optionally with specific foreground/background colors name and font size and bold characters):
 	
 	```
-	https://<server-ip-address>:<port>/worker/web/v1/jobs/long/output/stream?id=<job-id>
+	https://<server-ip-address>:<port>/worker/web/v1/jobs/long/output/stream?id=<job-id>&fg=<foreground-color>&bg=<background-color>&bold=[true|false]&size=<value>
 	```
 
 	[+] On Windows or Linux Operating System.
 	```
-	example: https://127.0.0.1:8080/worker/web/v1/jobs/long/output/stream?id=abe478954cef4125
+	example: https://127.0.0.1:8080/worker/web/v1/jobs/long/output/stream?id=abe478954cef4125&size=20
+	example: https://127.0.0.1:8080/worker/web/v1/jobs/long/output/stream?id=abe478954cef4125&fg=white&bg=#77216F&bold=true
 	```
 
 
@@ -314,7 +317,7 @@ $ docker run -d --publish 8080:8080 --name unix-worker --rm unix-worker /bin/sh 
 	```
 
 
-* To download the file containing the dumped output of a job:
+* To download the file containing the output of a job (only for long jobs with dump option enabled):
 	
 	```
 	https://<server-ip-address>:<port>/worker/web/v1/jobs/x/output/download?id=<job-1-id>
@@ -414,17 +417,17 @@ $ docker run -d --publish 8080:8080 --name unix-worker --rm unix-worker /bin/sh 
 
 * add filter option to display details of only completed or stopped or running jobs.
 * add option to store jobs result to redis server rather than in-memory map.
-* add URI to download the output of multiple jobs as a single zip or gzip file.
 * add command line options on worker service to list or delete jobs or dump jobs output.
 * add feature to move worker service into maintenance mode - stop accepting jobs.
 * limit the overall number of jobs scheduling to 10K and make it dynamically configurable.
 * embed websocket html/JS template file into executable by leveraging golang 1.16 feature.
 * refactore logging format by using external library logrus for logging into json format.
 * enforce puggeable auth/authz with RBAC and add default root user/password at startup.
-* refactor job with streaming capability to handle over multiple websockets at the same time.
+* refactor job with streaming capability to stream over multiple websockets at the same time.
 * display submit/start/end per client browser timezone and send them as unixnano in api response.
 * propagate web request or api call id into jobs processing logs.
 * enforce per process resources limitations (cpu and memory usage).
+* refactor api and web requests unique id for better meaning - date - hour - resources
 
 
 ## Contribution
