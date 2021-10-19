@@ -263,7 +263,7 @@ func scheduleLongJobsWithStreaming(w http.ResponseWriter, r *http.Request) {
 		}
 
 		job := &Job{
-			id:          generateID(),
+			id:          generateID(8),
 			pid:         0,
 			task:        cmds[0],
 			islong:      true,
@@ -313,7 +313,7 @@ func scheduleLongJobsWithStreaming(w http.ResponseWriter, r *http.Request) {
 	// build each job per command with resources limit values.
 	for i, cmd := range cmds {
 		job := &Job{
-			id:          generateID(),
+			id:          generateID(8),
 			pid:         0,
 			task:        cmd,
 			islong:      true,
@@ -399,7 +399,7 @@ func scheduleLongJobsWithDumping(w http.ResponseWriter, r *http.Request) {
 	// build each job per command with resources limit values.
 	for i, cmd := range cmds {
 		job := &Job{
-			id:          generateID(),
+			id:          generateID(8),
 			pid:         0,
 			task:        cmd,
 			islong:      true,

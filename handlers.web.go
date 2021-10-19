@@ -88,7 +88,7 @@ func instantCommandExecutor(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(200)
 	// build an id for this job and save its pid.
-	id := generateID()
+	id := generateID(8)
 	pid := cmd.Process.Pid
 
 	select {
@@ -409,7 +409,7 @@ func scheduleShortRunningJobs(w http.ResponseWriter, r *http.Request) {
 	// build each job per command with resources limit values.
 	for i, cmd := range cmds {
 		job := &Job{
-			id:          generateID(),
+			id:          generateID(8),
 			pid:         0,
 			task:        cmd,
 			islong:      false,

@@ -83,7 +83,7 @@ func apiScheduleJobs(w http.ResponseWriter, r *http.Request) {
 		}
 
 		job := &Job{
-			id:          generateID(),
+			id:          generateID(8),
 			pid:         0,
 			task:        jobInfos.Task,
 			islong:      jobInfos.IsLong,
