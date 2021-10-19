@@ -1,7 +1,7 @@
 # web-based-jobs-worker-service
 
-A go-based fast backend service to spin up and control (stop / fetch / stream / restart / delete) multiple remote jobs (applications or shell commands)
-with the capabilities to specify the execution timeout and resources limitations for these jobs. You perform anything from your browser or by RestFul APIs. 
+A go-based fast backend service to spin up and control (stop / fetch / live-stream / download / restart / delete) multiple remote jobs (applications or shell commands)
+with the capabilities to specify the execution timeout and resources limitations for these jobs. You perform anything from your usual web browser or by RestFul APIs. 
 
 * General Features Overview - Click to watch the live [demo video](https://youtu.be/_xnINhN8MRI)
 * Dual Streaming Feature - Click to watch the live [demo video](https://youtu.be/NsM7AhWkCko)
@@ -12,7 +12,8 @@ with the capabilities to specify the execution timeout and resources limitations
 * [Features](#features)
 * [Technologies](#technologies)
 * [Setup](#setup)
-* [Usage](#usage)
+* [Get Started](#get-started)
+* [Web Access](#web-access)
 * [Rest APIs](#rest-apis)
 * [Upcomings](#upcomings)
 * [Contribution](#contribution)
@@ -27,11 +28,12 @@ spin up some background procedures (goroutines) such as a monitoring service (cl
 service (handleSignal - to process any system call exit signals) and a monitoring jobs queue service (jobsMonitor - to watch the jobs queue/channel and start processing).
 
 After creating the dedicated logs folder and files it loads its self-signed certificate and rsa-based private key. In case these files are not present into the certs
-folder, they will be created automatically with builtin parameters. This certificate is used by the web service to setup its TLS configurations.
+folder, they will be created automatically with configurable parameters. This certificate is used by the web service to setup its TLS configurations.
 
 Once the web server is up & running, you can submit one or multiple jobs for remote execution. For each job, a unique id (16 hexadecimal characters) will be generated to
-identify this job, so it can be used to check the stop status or stop or restart or fetch the output restult of that job. Each job output is made available into memory
-for fast access.
+identify this job, so it can be used to check the status or stop or restart or fetch or live-streaming the output of that job. When submitted a job you must specify if the
+output should be buffered into memory or streamed over a websocket or/and towards a file. By default a short running job output is saved into memory buffer. Any job output
+saved into a file during its processing could be downloaded as well.
 
 All jobs could be stopped or restarted as well. When a job restart is requested, in case this job is still running, it will only be stopped and you will need to restart it
 again in order to have it scheduled for processing. If already completed it will be immediately scheduled for processing.
@@ -46,7 +48,7 @@ the features APIs exposed by the web server under the [usage section](#usage).
 
 Below is a summary of available features. This section will be updated as project continue:
 
-* unique output log folder for each worker startup
+* auto-generated and daily grouping of log folders done at each worker startup
 * single fixed worker log for standard output & error
 * per startup web server log and jobs log and deletion cron log
 * command-line options to start or stop or restart the worker
@@ -65,7 +67,9 @@ Below is a summary of available features. This section will be updated as projec
 * restful apis to schedule multiple jobs and check their status and fetch their output
 * dump max-aged jobs output to disk file before deleting them from the result map
 * tag each web or api request/call with a unique request id for tracing & debugging
+* auto-generated json-based configuration file containing the worker settings
 * user-defined foreground & background colors & font-size & font-weight of streaming web page
+* capability to specify in config file if Web and/or API URLS should be enabled or disabled
 
 
 Please feel free to have a look at the [usage section](#usage) for examples.
@@ -112,7 +116,10 @@ $ docker run -d --publish 8080:8080 --name unix-worker --rm unix-worker /bin/sh 
 
 
 
-## Usage
+## Get-Started
+
+
+*Once you have build the worker service executable file - use below available options to control*
 
 
 * Find below command line options dedicated to the worker service :
@@ -126,6 +133,13 @@ $ docker run -d --publish 8080:8080 --name unix-worker --rm unix-worker /bin/sh 
 	```
 	./worker [ start | stop | restart | status | help | version]
 	```
+
+
+
+## Web-Access
+
+
+*Once the worker service has started - the embedded web server can handle below requests*
 
 	
 * To view this documentation online - for web access or apis calls:
@@ -331,6 +345,9 @@ $ docker run -d --publish 8080:8080 --name unix-worker --rm unix-worker /bin/sh 
 
 
 ## REST-APIs
+
+
+*Once the worker service has started - the embedded API gateway can handle below calls*
 
 
 * To execute one or multiple short or long running jobs:
