@@ -93,12 +93,18 @@ func generateID(size int) string {
 // generateApiRequestID returns a string which is used as API call id.
 // The returned string follows this format : API.211019.204450.xxxxxx
 func generateApiRequestID(t time.Time) string {
+	if Config.EnableLogsTimestampInUTC {
+		t = t.UTC()
+	}
 	return fmt.Sprintf("API.%02d%02d%02d.%02d%02d%02d.%s", t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), generateID(3))
 }
 
 // generateWebRequestID returns a string which is used as WEB request id.
 // The returned string follows this format : WEB.211019.204450.xxxxxx
 func generateWebRequestID(t time.Time) string {
+	if Config.EnableLogsTimestampInUTC {
+		t = t.UTC()
+	}
 	return fmt.Sprintf("WEB.%02d%02d%02d.%02d%02d%02d.%s", t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), generateID(3))
 }
 

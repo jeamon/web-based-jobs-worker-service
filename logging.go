@@ -60,7 +60,10 @@ func setupLoggers() {
 		os.Exit(1)
 	}
 	// setup logging format and parameters.
-	weblog = log.New(weblogfile, "", log.LstdFlags|log.Lshortfile|log.LUTC)
+	if Config.EnableLogsTimestampInUTC {
+		weblog = log.New(weblogfile, "", log.LstdFlags|log.Lshortfile|log.LUTC)
+	}
+	weblog = log.New(weblogfile, "", log.LstdFlags|log.Lshortfile)
 
 	// create the log file for api calls.
 	apilogfile, err := os.OpenFile(filepath.Join(logsFolderPath, Config.ApiRequestsLogFile), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
@@ -71,7 +74,10 @@ func setupLoggers() {
 		os.Exit(1)
 	}
 	// setup logging format and parameters.
-	apilog = log.New(apilogfile, "", log.LstdFlags|log.Lshortfile|log.LUTC)
+	if Config.EnableLogsTimestampInUTC {
+		apilog = log.New(apilogfile, "", log.LstdFlags|log.Lshortfile|log.LUTC)
+	}
+	apilog = log.New(apilogfile, "", log.LstdFlags|log.Lshortfile)
 
 	// create file to log deleted jobs by cleanupMapResults goroutine.
 	deletedjobslogfile, err := os.OpenFile(filepath.Join(logsFolderPath, Config.JobsDeletionLogFile), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
@@ -82,7 +88,10 @@ func setupLoggers() {
 		os.Exit(1)
 	}
 	// setup logging format and parameters.
-	deletedjobslog = log.New(deletedjobslogfile, "", log.LstdFlags|log.Lshortfile|log.LUTC)
+	if Config.EnableLogsTimestampInUTC {
+		deletedjobslog = log.New(deletedjobslogfile, "", log.LstdFlags|log.Lshortfile|log.LUTC)
+	}
+	deletedjobslog = log.New(deletedjobslogfile, "", log.LstdFlags|log.Lshortfile)
 
 	// create file to log jobs related activities.
 	jobslogfile, err := os.OpenFile(filepath.Join(logsFolderPath, Config.JobsProcessLogFile), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
@@ -93,7 +102,10 @@ func setupLoggers() {
 		os.Exit(1)
 	}
 	// setup logging format and parameters.
-	jobslog = log.New(jobslogfile, "", log.LstdFlags|log.Lshortfile|log.LUTC)
+	if Config.EnableLogsTimestampInUTC {
+		jobslog = log.New(jobslogfile, "", log.LstdFlags|log.Lshortfile|log.LUTC)
+	}
+	jobslog = log.New(jobslogfile, "", log.LstdFlags|log.Lshortfile)
 
 	log.Println("logs folder and all log files successfully created.")
 }
