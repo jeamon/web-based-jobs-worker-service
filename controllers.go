@@ -32,17 +32,17 @@ func cleanupMapResults(interval int, maxcount int, deadtime int, exit <-chan str
 			for id, job := range globalJobsResults {
 				if job.iscompleted && (job.fetchcount > maxcount || (time.Since(job.endtime) > (time.Duration(deadtime) * time.Minute))) {
 					// job terminated and reached deadtime or max fetch count.
-					// so, if it is a short job dump its output. Then delete it.
+					// so, if it is a short job backup its output. Then delete it.
 					if !job.islong {
 						filenameSuffix := fmt.Sprintf("%02d%02d%02d.%s.txt", job.submittime.Year(), job.submittime.Month(), job.submittime.Day(), job.id)
-						filename := filepath.Join(Config.JobsOutputsFolder, filenameSuffix)
+						filename := filepath.Join(Config.JobsOutputsBackupsFolder, filenameSuffix)
 						if err := os.WriteFile(filename, job.result.Bytes(), 0644); err != nil {
-							deletedjobslog.Printf("[%s] [%05d] cleanup routine failed to dump job output before deletion.\n", id, job.id)
+							deletedjobslog.Printf("[%s] [%05d] cleanup routine failed to backup job output before deletion.\n", id, job.pid)
 						}
 					}
 
 					delete(globalJobsResults, id)
-					deletedjobslog.Printf("[%s] [%05d] cleanup routine removed job from the results queue.\n", id, job.id)
+					deletedjobslog.Printf("[%s] [%05d] cleanup routine removed job from the results queue.\n", id, job.pid)
 				}
 			}
 			mapLock.Unlock()

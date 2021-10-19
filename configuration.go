@@ -52,6 +52,7 @@ type Configuration struct {
 	StreamPageDefaultForegroundColor string `json:"stream_page_default_foreground_color"` // if text color not set in stream request use this.
 	StreamPageDefaultBackgroundColor string `json:"stream_page_default_background_color"` // if page background color not set in stream request use this.
 	StreamPageDefaultFontSize        int    `json:"stream_page_default_font_size"`        // if page font size not set in stream request use this.
+	JobsOutputsBackupsFolder         string `json:"jobs_outputs_backups_folder"`          // folder to store jobs outputs as backup before cleanup/deletion.
 }
 
 // config filename to be used to setup the worker service.
@@ -103,6 +104,7 @@ var defaultConfig = Configuration{
 	StreamPageDefaultForegroundColor: "white",
 	StreamPageDefaultBackgroundColor: "black",
 	StreamPageDefaultFontSize:        18,
+	JobsOutputsBackupsFolder:         "./backups",
 }
 
 // dumpDefaultConfig is triggered when passed config file is not found or erroned. It loads

@@ -35,8 +35,9 @@ func initializeWorkerSettings() {
 	// compile stream web page template.
 	tmpl = template.Must(template.ParseFiles("websocket.html"))
 
-	// ensure jobs outputs folder is present.
+	// ensure jobs outputs & backups folder are present.
 	createFolder(Config.JobsOutputsFolder)
+	createFolder(Config.JobsOutputsBackupsFolder)
 
 	// for linux-based platform lets find the current shell binary path
 	// if environnement shell not set or empty we use default config.
