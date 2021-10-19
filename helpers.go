@@ -47,7 +47,7 @@ func getFromRequest(r *http.Request, key string) string {
 	if value := r.Context().Value(key); value != nil {
 		return value.(string)
 	}
-	return ""
+	return "n/a"
 }
 
 // truncateSyntax takes a command syntax as input and returns a shorten version of this syntax
@@ -77,17 +77,29 @@ func formatSize(size float64) string {
 	}
 }
 
-// generateID uses rand from crypto module to generate random
-// value into hexadecimal mode. This value will be used as uid.
-func generateID() string {
+// generateID uses rand from crypto module to generate random size value into hexadecimal mode.
+// This value is used to build uid for job and request (web &api). For size, it returns (size x 2) chars.
+func generateID(size int) string {
 
 	// randomly fill the 8 capacity slice of bytes
-	b := make([]byte, 8)
+	b := make([]byte, size)
 	if _, err := rand.Read(b); err != nil {
 		// use current number of nanoseconds since January 1, 1970 UTC
 		return fmt.Sprintf("%x", time.Now().UnixNano())
 	}
 	return fmt.Sprintf("%x", b)
+}
+
+// generateApiRequestID returns a string which is used as API call id.
+// The returned string follows this format : API.211019.204450.xxxxxx
+func generateApiRequestID(t time.Time) string {
+	return fmt.Sprintf("API.%02d%02d%02d.%02d%02d%02d.%s", t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), generateID(3))
+}
+
+// generateWebRequestID returns a string which is used as WEB request id.
+// The returned string follows this format : WEB.211019.204450.xxxxxx
+func generateWebRequestID(t time.Time) string {
+	return fmt.Sprintf("WEB.%02d%02d%02d.%02d%02d%02d.%s", t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), generateID(3))
 }
 
 // createFolder makes sure that <folderPath> is present, and if not creates it.
@@ -156,7 +168,7 @@ func removeDuplicateJobIds(ids *[]string) bool {
 	return false
 }
 
-//  SendErrorMessage sends error messages into JSON as HTTP response.
+// SendErrorMessage sends error messages into JSON as HTTP response.
 func SendErrorMessage(w http.ResponseWriter, requestid string, message string, code int) {
 
 	errorDetails := ApiErrorMessage{

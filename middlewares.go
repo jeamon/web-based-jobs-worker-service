@@ -6,21 +6,19 @@ import (
 	"context"
 	"net/http"
 	"strings"
+	"time"
 )
 
 // requestMiddleware adds for each request an id into the request context
 // and logs accordingly its details. For api calls it enables CORS as well.
 func requestMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// generate and setup request id if not set.
-		requestid := generateID()
-		ctx := context.WithValue(r.Context(), "requestid", requestid)
-		r = r.WithContext(ctx)
 
+		var requestid string
 		if strings.HasPrefix(r.URL.Path, "/worker/api/") {
-			// api call, enable cors and log.
+			// api call, build the id and enable cors and log.
+			requestid = generateApiRequestID(time.Now().UTC())
 			apilog.Printf("[request:%s] - [ip:%s] - [method:%s] - [url:%s] - [agent:%s]\n", requestid, r.RemoteAddr, r.Method, r.URL.Path, r.UserAgent())
-
 			enableCORS(&w, r)
 
 			if r.Method == "OPTIONS" {
@@ -30,10 +28,14 @@ func requestMiddleware(next http.Handler) http.Handler {
 			}
 
 		} else {
-			// save as web requests.
-			weblog.Printf("request: %s] - [ip: %s] - [method: %s] - [url: %s] - [agent: %s]\n", requestid, r.RemoteAddr, r.Method, r.URL.Path, r.UserAgent())
+			// process as web requests. so build the id and log.
+			requestid = generateWebRequestID(time.Now().UTC())
+			weblog.Printf("[request: %s] - [ip: %s] - [method: %s] - [url: %s] - [agent: %s]\n", requestid, r.RemoteAddr, r.Method, r.URL.Path, r.UserAgent())
 		}
-		next.ServeHTTP(w, r)
+
+		// add the request id to the context and forward the request.
+		ctx := context.WithValue(r.Context(), "requestid", requestid)
+		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
 
