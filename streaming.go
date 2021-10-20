@@ -8,6 +8,7 @@ import (
 	"github.com/gorilla/websocket"
 	"io"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -26,35 +27,37 @@ var connectionUpgradeRegex = regexp.MustCompile("(^|.*,\\s*)upgrade($|\\s*,)")
 
 // serveStreamPage delivers the web page which contains javascript code to initiate websocket connection.
 func serveStreamPage(w http.ResponseWriter, r *http.Request) {
+	requestid := getFromRequest(r, "requestid")
+	query := r.URL.Query()
 	// expect one value for the query.
-	id := r.URL.Query().Get("id")
+	id := query.Get("id")
 	// make sure id provided matche - 16 hexa characters.
 	if match, _ := regexp.MatchString(`[a-z0-9]{16}`, id); !match {
-		w.WriteHeader(400)
+		w.WriteHeader(http.StatusBadRequest)
 		fmt.Fprintln(w, "Sorry, the Job ID provided is invalid.")
 		return
 	}
 
 	// retrieve and setup foreground text color to use.
-	fgcolor := r.URL.Query().Get("fg")
+	fgcolor := query.Get("fg")
 	if len(fgcolor) == 0 {
 		fgcolor = Config.StreamPageDefaultForegroundColor
 	}
 	// retrieve and setup background page color to use.
-	bgcolor := r.URL.Query().Get("bg")
+	bgcolor := query.Get("bg")
 	if len(bgcolor) == 0 {
 		bgcolor = Config.StreamPageDefaultBackgroundColor
 	}
 	// retrieve and setup page text font size.
 	bold := false
-	if strings.ToLower(r.URL.Query().Get("bold")) == "true" {
+	if strings.ToLower(query.Get("bold")) == "true" {
 		bold = true
 	}
 
 	// setup streaming page text size. user submitted size
 	// should be higher than 16px and less than 24px.
 	fontSize := Config.StreamPageDefaultFontSize
-	if size, err := strconv.Atoi(r.URL.Query().Get("size")); err == nil && size >= 16 && size <= 24 {
+	if size, err := strconv.Atoi(query.Get("size")); err == nil && size >= 16 && size <= 24 {
 		fontSize = size
 	}
 
@@ -69,7 +72,8 @@ func serveStreamPage(w http.ResponseWriter, r *http.Request) {
 	}
 	err := tmpl.Execute(w, info)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprintln(w, fmt.Sprintf("Sorry, unexpected error occured while rendering the streaming page. Contact the support with below.\n\nRequest ID:%s\nError Message:%s", requestid, err.Error()))
 		return
 	}
 }
@@ -211,8 +215,8 @@ func scheduleLongJobsWithStreaming(w http.ResponseWriter, r *http.Request) {
 	if !exist || len(cmds) == 0 {
 		w.Header().Set("Content-Type", "text/plain; charset=utf8")
 		// request does not contains query string cmd.
-		w.WriteHeader(400)
-		fmt.Fprintf(w, "\n[+] Sorry, the request submitted is malformed. To view the documentation, go to https://"+Config.HttpsServerHost+":"+Config.HttpsServerPort+"/worker/web/v1/docs")
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprintf(w, "\nSorry, the request submitted is malformed/invalid. It does not contain any task to schedule.\nTo view the documentation, go to https://"+Config.HttpsServerHost+":"+Config.HttpsServerPort+"/worker/web/v1/docs")
 		return
 	}
 	// default memory (megabytes) and cpu (percentage) limit values.
@@ -291,7 +295,7 @@ func scheduleLongJobsWithStreaming(w http.ResponseWriter, r *http.Request) {
 		// add this job to the processing queue.
 		globalJobsQueue <- job
 		jobslog.Printf("[%s] [%05d] scheduled the processing of the job\n", job.id, job.pid)
-		http.Redirect(w, r, fmt.Sprintf("https://%s/worker/web/v1/jobs/long/output/stream?id=%s&fg=%s&bg=%s&bold=%s&size=%d", r.Host, job.id, fgcolor, bgcolor, bold, fontSize), http.StatusMovedPermanently)
+		http.Redirect(w, r, fmt.Sprintf("https://%s/worker/web/v1/jobs/long/output/stream?id=%s&fg=%s&bg=%s&bold=%s&size=%d", r.Host, job.id, url.QueryEscape(fgcolor), url.QueryEscape(bgcolor), bold, fontSize), http.StatusMovedPermanently)
 		return
 	}
 
