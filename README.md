@@ -70,17 +70,27 @@ Below is a summary of available features. This section will be updated as projec
 * auto-generated json-based configuration file containing the worker settings
 * user-defined foreground & background colors & font-size & font-weight of streaming web page
 * capability to specify in config file if Web and/or API URLS should be enabled or disabled
+* capability to download the output dump file of a long running job (scheduled with dump option)
+* user-defined settings option to specify if logs entries and requests id timestamp must use UTC or local TZ
 
 
-Please feel free to have a look at the [usage section](#usage) for examples.
+Please feel free to have a look at the [Web Access](#web-access) and [Rest APIs](#rest-apis) for practical examples.
 
 
 
 ## Technologies
 
-This project is developed with:
+This project is developed with below packages. It has been designed to be & stay simpler as much as possible.
+This philosophy leads to have a single main package with multiple self-described files for code organization. 
+Thus makes it easier to move as you wish to a more garnular packaging approach during codebase refactoring.
+
 * Golang version: 1.16+
-* Golang Native packages
+* Golang Native packages / features
+
+net/http - context - html/template - io - log - os/exec - encoding/json - errors
+runtime - sync - syscall - regexp - bufio - os/signal - sort - bytes - unicode/utf8
+crypto/tls - crypto/rand - crypto/rsa - crypto/x509 - crypto/x509/pkix - encoding/pem
+
 * [Gorilla Websocket Package](https://pkg.go.dev/github.com/gorilla/websocket)
 
 
@@ -433,18 +443,17 @@ $ docker run -d --publish 8080:8080 --name unix-worker --rm unix-worker /bin/sh 
 ## Upcomings
 
 * add filter option to display details of only completed or stopped or running jobs.
-* add option to store jobs result to redis server rather than in-memory map.
+* add settings option to store jobs result to redis server or defautl in-memory map.
 * add command line options on worker service to list or delete jobs or dump jobs output.
 * add feature to move worker service into maintenance mode - stop accepting jobs.
 * limit the overall number of jobs scheduling to 10K and make it dynamically configurable.
 * embed websocket html/JS template file into executable by leveraging golang 1.16 feature.
-* refactore logging format by using external library logrus for logging into json format.
+* refactore logging format by using external library logrus/zerolog for logging into json format.
 * enforce puggeable auth/authz with RBAC and add default root user/password at startup.
 * refactor job with streaming capability to stream over multiple websockets at the same time.
 * display submit/start/end per client browser timezone and send them as unixnano in api response.
 * propagate web request or api call id into jobs processing logs.
 * enforce per process resources limitations (cpu and memory usage).
-* refactor api and web requests unique id for better meaning - date - hour - resources
 
 
 ## Contribution
