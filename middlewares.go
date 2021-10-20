@@ -18,7 +18,7 @@ func requestMiddleware(next http.Handler) http.Handler {
 		if strings.HasPrefix(r.URL.Path, "/worker/api/") {
 			// api call, build the id and enable cors and log.
 			requestid = generateApiRequestID(time.Now().UTC())
-			apilog.Printf("[request:%s] - [ip:%s] - [method:%s] - [url:%s] - [agent:%s]\n", requestid, r.RemoteAddr, r.Method, r.URL.Path, r.UserAgent())
+			apilog.Printf("[request:%s] - [ip:%s] - [method:%s] - [url:%s] - [agent:%s]\n", requestid, r.RemoteAddr, r.Method, r.URL, r.UserAgent())
 			enableCORS(&w, r)
 
 			if r.Method == "OPTIONS" {
@@ -30,7 +30,7 @@ func requestMiddleware(next http.Handler) http.Handler {
 		} else {
 			// process as web requests. so build the id and log.
 			requestid = generateWebRequestID(time.Now().UTC())
-			weblog.Printf("[request: %s] - [ip: %s] - [method: %s] - [url: %s] - [agent: %s]\n", requestid, r.RemoteAddr, r.Method, r.URL.Path, r.UserAgent())
+			weblog.Printf("[request: %s] - [ip: %s] - [method: %s] - [url: %s] - [agent: %s]\n", requestid, r.RemoteAddr, r.Method, r.URL, r.UserAgent())
 		}
 
 		// add the request id to the context and forward the request.
