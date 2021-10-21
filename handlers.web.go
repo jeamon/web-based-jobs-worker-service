@@ -127,8 +127,8 @@ func instantCommandExecutor(w http.ResponseWriter, r *http.Request) {
 	jobslog.Printf("[%s] [%05d] completed the processing of the job\n", id, pid)
 }
 
-// checkJobsStatusById tells us if one or multiple submitted jobs are either in progress
-// or terminated or do not exist. triggered for following request : /jobs/status?id=xx&id=xx
+// checkJobsStatusById display a summary table of the status of one or multiple jobs based
+// on their ids. GET /worker/web/v1/jobs/x/status/check?id=<jobid>&id=<jobid>.
 func checkJobsStatusById(w http.ResponseWriter, r *http.Request) {
 	// try to setup the response as not buffered data. if succeeds it will be used to flush.
 	f, ok := w.(http.Flusher)
@@ -156,11 +156,8 @@ func checkJobsStatusById(w http.ResponseWriter, r *http.Request) {
 	if ok {
 		f.Flush()
 	}
-	// format the display table.
-	title := fmt.Sprintf("|%-4s | %-16s | %-5s | %-5s | %-5s | %-7s | %-9s | %-9s | %-5s | %-5s | %-5s | %-7s | %-20s | %-20s | %-20s | %-30s |", "Nb", "Job ID", "PID", "Long", "Done", "Success", "Exit Code", "Data [KB]", "Count", "Mem", "CPU%", "Timeout", "Submitted At [UTC]", "Started At [UTC]", "Ended At [UTC]", "Command Syntax")
-	fmt.Fprintln(w, strings.Repeat("=", len(title)))
-	fmt.Fprintln(w, title)
-	fmt.Fprintf(w, fmt.Sprintf("+%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+\n", Dashs(4), Dashs(16), Dashs(5), Dashs(5), Dashs(5), Dashs(7), Dashs(9), Dashs(9), Dashs(5), Dashs(5), Dashs(5), Dashs(7), Dashs(20), Dashs(20), Dashs(20), Dashs(30)))
+	// send the table headers.
+	fmt.Fprintf(w, formatJobsStatusTableHeaders())
 	if ok {
 		f.Flush()
 	}
@@ -172,7 +169,6 @@ func checkJobsStatusById(w http.ResponseWriter, r *http.Request) {
 	for _, id := range ids {
 
 		job, exist := globalJobsResults[id]
-
 		if !exist {
 			// job id does not exist.
 			errorsMessages = errorsMessages + fmt.Sprintf("\n[-] Job ID [%s] does not exist - maybe wrong id or removed from store\n", id)
@@ -208,9 +204,8 @@ func checkJobsStatusById(w http.ResponseWriter, r *http.Request) {
 			// long job with dump option.
 			sizeFormat = "N/A"
 		}
-		// stream the added job details to user/client.
-		fmt.Fprintln(w, fmt.Sprintf("|%04d | %-16s | %05d | %-5v | %-5v | %-7v | %-9d | %-9s | %-5d | %-5d | %-5d | %-7d | %-20v | %-20v | %-20v | %-30s |", i, job.id, job.pid, job.islong, job.iscompleted, job.issuccess, job.exitcode, sizeFormat, job.fetchcount, job.memlimit, job.cpulimit, job.timeout, (job.submittime).Format("2006-01-02 15:04:05"), start, end, truncateSyntax(job.task, 30)))
-		fmt.Fprintf(w, fmt.Sprintf("+%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+\n", Dashs(4), Dashs(16), Dashs(5), Dashs(5), Dashs(5), Dashs(7), Dashs(9), Dashs(9), Dashs(5), Dashs(5), Dashs(5), Dashs(7), Dashs(20), Dashs(20), Dashs(20), Dashs(30)))
+		// stream this job status as a row.
+		fmt.Fprintf(w, job.formatStatusAsTableRow(i, start, end, sizeFormat))
 		if ok {
 			f.Flush()
 		}
@@ -224,7 +219,7 @@ func checkJobsStatusById(w http.ResponseWriter, r *http.Request) {
 }
 
 // getAllJobsStatus display all jobs details by sorting (either in ascending or descending) them based on submitted time
-// then started time and then ended time. It is triggered for the following request : /jobs/status/?order=asc|desc
+// then started time and then ended time. GET /worker/web/v1/jobs/x/status/check/all?order=asc|desc.
 func getAllJobsStatus(w http.ResponseWriter, r *http.Request) {
 	// try to setup the response as not buffered data. if succeeds it will be used to flush.
 	f, ok := w.(http.Flusher)
@@ -242,11 +237,8 @@ func getAllJobsStatus(w http.ResponseWriter, r *http.Request) {
 	if ok {
 		f.Flush()
 	}
-	// format the display table.
-	title := fmt.Sprintf("|%-4s | %-16s | %-5s | %-5s | %-5s | %-7s | %-9s | %-9s | %-5s | %-5s | %-5s | %-7s | %-20s | %-20s | %-20s | %-30s |", "Nb", "Job ID", "PID", "Long", "Done", "Success", "Exit Code", "Data [KB]", "Count", "Mem", "CPU%", "Timeout", "Submitted At [UTC]", "Started At [UTC]", "Ended At [UTC]", "Command Syntax")
-	fmt.Fprintln(w, strings.Repeat("=", len(title)))
-	fmt.Fprintln(w, title)
-	fmt.Fprintf(w, fmt.Sprintf("+%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+\n", Dashs(4), Dashs(16), Dashs(5), Dashs(5), Dashs(5), Dashs(7), Dashs(9), Dashs(9), Dashs(5), Dashs(5), Dashs(5), Dashs(7), Dashs(20), Dashs(20), Dashs(20), Dashs(30)))
+	// send the table headers.
+	fmt.Fprintf(w, formatJobsStatusTableHeaders())
 	if ok {
 		f.Flush()
 	}
@@ -322,9 +314,8 @@ func getAllJobsStatus(w http.ResponseWriter, r *http.Request) {
 			// long job with dump option.
 			sizeFormat = "N/A"
 		}
-		// stream the added job details to user/client.
-		fmt.Fprintln(w, fmt.Sprintf("|%04d | %-16s | %05d | %-5v | %-5v | %-7v | %-9d | %-9s | %-5d | %-5d | %-5d | %-7d | %-20v | %-20v | %-20v | %-30s |", i, job.id, job.pid, job.islong, job.iscompleted, job.issuccess, job.exitcode, sizeFormat, job.fetchcount, job.memlimit, job.cpulimit, job.timeout, (job.submittime).Format("2006-01-02 15:04:05"), start, end, truncateSyntax(job.task, 30)))
-		fmt.Fprintf(w, fmt.Sprintf("+%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+\n", Dashs(4), Dashs(16), Dashs(5), Dashs(5), Dashs(5), Dashs(7), Dashs(9), Dashs(9), Dashs(5), Dashs(5), Dashs(5), Dashs(7), Dashs(20), Dashs(20), Dashs(20), Dashs(30)))
+		// stream this job status as a row.
+		fmt.Fprintf(w, job.formatStatusAsTableRow(i, start, end, sizeFormat))
 		if ok {
 			f.Flush()
 		}
