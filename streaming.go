@@ -306,11 +306,8 @@ func scheduleLongJobsWithStreaming(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(200)
 	w.Write([]byte("\n[+] find below some details of the jobs submitted\n\n"))
 
-	// format the display table.
-	title := fmt.Sprintf("|%-4s | %-18s | %-14s | %-10s | %-7s | %-20s | %-30s |", "Nb", "Job ID", "Memory [MB]", "CPU [%]", "Timeout", "Submitted At [UTC]", "Command Syntax")
-	fmt.Fprintln(w, strings.Repeat("=", len(title)))
-	fmt.Fprintln(w, title)
-	fmt.Fprintf(w, fmt.Sprintf("+%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+\n", Dashs(4), Dashs(18), Dashs(14), Dashs(10), Dashs(7), Dashs(20), Dashs(30)))
+	// send the table headers.
+	fmt.Fprintf(w, formatJobsScheduledTableHeaders())
 	if ok {
 		f.Flush()
 	}
@@ -345,9 +342,8 @@ func scheduleLongJobsWithStreaming(w http.ResponseWriter, r *http.Request) {
 		// add this job to the processing queue.
 		globalJobsQueue <- job
 		jobslog.Printf("[%s] [%05d] scheduled the processing of the job\n", job.id, job.pid)
-		// stream the added job details to user/client.
-		fmt.Fprintln(w, fmt.Sprintf("|%04d | %-18s | %-14d | %-10d | %-7d | %-20v | %-30s |", i+1, job.id, job.memlimit, job.cpulimit, job.timeout, (job.submittime).Format("2006-01-02 15:04:05"), truncateSyntax(job.task, 30)))
-		fmt.Fprintf(w, fmt.Sprintf("+%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+\n", Dashs(4), Dashs(18), Dashs(14), Dashs(10), Dashs(7), Dashs(20), Dashs(30)))
+		// stream this scheduled job details as a row.
+		fmt.Fprintf(w, job.formatScheduledInfosAsTableRow(i+1))
 		if ok {
 			f.Flush()
 		}
@@ -392,11 +388,8 @@ func scheduleLongJobsWithDumping(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(200)
 	w.Write([]byte("\n[+] find below the details of the long running jobs (with output dump-only option) submitted\n\n"))
 
-	// format the display table.
-	title := fmt.Sprintf("|%-4s | %-18s | %-14s | %-10s | %-7s | %-20s | %-30s |", "Nb", "Job ID", "Memory [MB]", "CPU [%]", "Timeout", "Submitted At [UTC]", "Command Syntax")
-	fmt.Fprintln(w, strings.Repeat("=", len(title)))
-	fmt.Fprintln(w, title)
-	fmt.Fprintf(w, fmt.Sprintf("+%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+\n", Dashs(4), Dashs(18), Dashs(14), Dashs(10), Dashs(7), Dashs(20), Dashs(30)))
+	// send the table headers.
+	fmt.Fprintf(w, formatJobsScheduledTableHeaders())
 	if ok {
 		f.Flush()
 	}
@@ -431,9 +424,8 @@ func scheduleLongJobsWithDumping(w http.ResponseWriter, r *http.Request) {
 		// add this job to the processing queue.
 		globalJobsQueue <- job
 		jobslog.Printf("[%s] [%05d] scheduled the processing of the job\n", job.id, job.pid)
-		// stream the added job details to user/client.
-		fmt.Fprintln(w, fmt.Sprintf("|%04d | %-18s | %-14d | %-10d | %-7d | %-20v | %-30s |", i+1, job.id, job.memlimit, job.cpulimit, job.timeout, (job.submittime).Format("2006-01-02 15:04:05"), truncateSyntax(job.task, 30)))
-		fmt.Fprintf(w, fmt.Sprintf("+%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+\n", Dashs(4), Dashs(18), Dashs(14), Dashs(10), Dashs(7), Dashs(20), Dashs(30)))
+		// stream this scheduled job details as a row.
+		fmt.Fprintf(w, job.formatScheduledInfosAsTableRow(i+1))
 		if ok {
 			f.Flush()
 		}
