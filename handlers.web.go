@@ -57,7 +57,7 @@ func instantCommandExecutor(w http.ResponseWriter, r *http.Request) {
 		cmd = exec.CommandContext(ctx, "cmd", "/C", task)
 	} else {
 		// syntax for linux-based platforms.
-		cmd = exec.CommandContext(ctx, shell, "-c", task)
+		cmd = exec.CommandContext(ctx, Config.DefaultLinuxShell, "-c", task)
 	}
 
 	// combine standart output and error pipes.
