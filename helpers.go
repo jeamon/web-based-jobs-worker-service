@@ -336,3 +336,25 @@ func (job *Job) formatStatusAsTableRow(i int, start, end, sizeFormat string) str
 	fmt.Fprintf(&sb, "+%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+\n", Dashs(4), Dashs(16), Dashs(5), Dashs(5), Dashs(6), Dashs(5), Dashs(5), Dashs(5), Dashs(4), Dashs(9), Dashs(5), Dashs(5), Dashs(5), Dashs(7), Dashs(20), Dashs(20), Dashs(20), Dashs(30))
 	return sb.String()
 }
+
+// formatJobsScheduledTableHeaders constructs and returns the headers of the scheduled jobs summary table.
+func formatJobsScheduledTableHeaders() string {
+	var sb strings.Builder
+	title := fmt.Sprintf("|%-4s | %-18s | %-5s | %-6s | %-5s | %-5s | %-6s | %-7s | %-20s | %-30s |", "Nb", "Job ID", "Long", "Stream", "Dump", "Mem", "CPU%%", "Timeout", "Submitted At [UTC]", "Command Syntax")
+	// minus 1 since CPU percentage symbol was escaped (it counts 1 word in reality).
+	sb.WriteString(strings.Repeat("=", len(title)-1))
+	sb.WriteByte('\n')
+	sb.WriteString(title)
+	sb.WriteByte('\n')
+	fmt.Fprintf(&sb, "+%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+\n", Dashs(4), Dashs(18), Dashs(5), Dashs(6), Dashs(5), Dashs(5), Dashs(5), Dashs(7), Dashs(20), Dashs(30))
+	return sb.String()
+}
+
+// formatScheduledInfosAsTableRow constructs and returns a given row content for the scheduled jobs summary table.
+func (job *Job) formatScheduledInfosAsTableRow(i int) string {
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "|%04d | %-18s | %-5v | %-6v | %-5v | %-5d | %-5d | %-7d | %-20v | %-30s |", i, job.id, job.islong, job.stream, job.dump, job.memlimit, job.cpulimit, job.timeout, (job.submittime).Format("2006-01-02 15:04:05"), truncateSyntax(job.task, 30))
+	sb.WriteByte('\n')
+	fmt.Fprintf(&sb, "+%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+\n", Dashs(4), Dashs(18), Dashs(5), Dashs(6), Dashs(5), Dashs(5), Dashs(5), Dashs(7), Dashs(20), Dashs(30))
+	return sb.String()
+}
