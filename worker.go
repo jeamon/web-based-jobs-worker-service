@@ -14,9 +14,6 @@ import (
 	"syscall"
 )
 
-// store shell name for linux-based system.
-var shell string
-
 // buffered (maxJobs) channel to hold submitted (*job).
 var globalJobsQueue chan *Job
 
@@ -40,11 +37,10 @@ func initializeWorkerSettings() {
 	createFolder(Config.JobsOutputsBackupsFolder)
 
 	// for linux-based platform lets find the current shell binary path
-	// if environnement shell not set or empty we use default config.
+	// if environnement shell is set and not empty we use it as default.
 	if runtime.GOOS != "windows" {
-		shell = os.Getenv("SHELL")
-		if shell == "" {
-			shell = Config.DefaultLinuxShell
+		if len(os.Getenv("SHELL")) > 0 {
+			Config.DefaultLinuxShell = os.Getenv("SHELL")
 		}
 	}
 }
