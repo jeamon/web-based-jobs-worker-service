@@ -579,11 +579,8 @@ func restartJobsById(w http.ResponseWriter, r *http.Request) {
 	if ok {
 		f.Flush()
 	}
-	// format the display table.
-	title := fmt.Sprintf("|%-4s | %-18s | %-14s | %-16s | %-12s |", "Nb", "Job ID", "Was Running", "Stop Triggered", "Restarted")
-	fmt.Fprintln(w, strings.Repeat("=", len(title)))
-	fmt.Fprintln(w, title)
-	fmt.Fprintf(w, fmt.Sprintf("+%s-+-%s-+-%s-+-%s-+-%s-+\n", Dashs(4), Dashs(18), Dashs(14), Dashs(16), Dashs(12)))
+	// send the table headers.
+	fmt.Fprintf(w, formatJobsRestartTableHeaders())
 	if ok {
 		f.Flush()
 	}
@@ -605,7 +602,7 @@ func restartJobsById(w http.ResponseWriter, r *http.Request) {
 			// job is still running. add value to stop channel to trigger job stop.
 			job.stop <- struct{}{}
 			jobslog.Printf("[%s] [%05d] restart requested for the running job. stop triggered for the job\n", job.id, job.pid)
-			fmt.Fprintln(w, fmt.Sprintf("|%04d | %-18s | %-14s | %-16s | %-12s |", i, job.id, "yes", "yes", "n/a"))
+			fmt.Fprintf(w, job.formatRestartInfosAsTableRow(i, "yes", "yes", "n/a"))
 
 		} else {
 			// job already completed (not running). reset and start it by adding to jobs queue.
@@ -614,10 +611,9 @@ func restartJobsById(w http.ResponseWriter, r *http.Request) {
 			mapLock.Unlock()
 			globalJobsQueue <- job
 			jobslog.Printf("[%s] [%05d] restart requested for the completed job. reset the details and scheduled the job\n", job.id, job.pid)
-			fmt.Fprintln(w, fmt.Sprintf("|%04d | %-18s | %-14s | %-16s | %-12s |", i, job.id, "no", "n/a", "yes"))
+			fmt.Fprintf(w, job.formatRestartInfosAsTableRow(i, "no", "n/a", "yes"))
 		}
 
-		fmt.Fprintf(w, fmt.Sprintf("+%s-+-%s-+-%s-+-%s-+-%s-+\n", Dashs(4), Dashs(18), Dashs(14), Dashs(16), Dashs(12)))
 		if ok {
 			f.Flush()
 		}
