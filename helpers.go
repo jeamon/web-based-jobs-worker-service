@@ -358,3 +358,24 @@ func (job *Job) formatScheduledInfosAsTableRow(i int) string {
 	fmt.Fprintf(&sb, "+%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+\n", Dashs(4), Dashs(18), Dashs(5), Dashs(6), Dashs(5), Dashs(5), Dashs(5), Dashs(7), Dashs(20), Dashs(30))
 	return sb.String()
 }
+
+// formatJobsRestartTableHeaders constructs and returns the headers of jobs restart summary table.
+func formatJobsRestartTableHeaders() string {
+	var sb strings.Builder
+	title := fmt.Sprintf("|%-4s | %-18s | %-14s | %-16s | %-12s |", "Nb", "Job ID", "Was Running", "Stop Triggered", "Restarted")
+	sb.WriteString(strings.Repeat("=", len(title)))
+	sb.WriteByte('\n')
+	sb.WriteString(title)
+	sb.WriteByte('\n')
+	fmt.Fprintf(&sb, "+%s-+-%s-+-%s-+-%s-+-%s-+\n", Dashs(4), Dashs(18), Dashs(14), Dashs(16), Dashs(12))
+	return sb.String()
+}
+
+// formatRestartInfosAsTableRow constructs and returns a given row content for the jobs restart summary table.
+func (job *Job) formatRestartInfosAsTableRow(i int, wasrunning, stoptrigger, restarted string) string {
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "|%04d | %-18s | %-14s | %-16s | %-12s |", i, job.id, wasrunning, stoptrigger, restarted)
+	sb.WriteByte('\n')
+	fmt.Fprintf(&sb, "+%s-+-%s-+-%s-+-%s-+-%s-+\n", Dashs(4), Dashs(18), Dashs(14), Dashs(16), Dashs(12))
+	return sb.String()
+}
