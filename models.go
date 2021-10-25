@@ -114,3 +114,14 @@ type ResponseFetchJobOutput struct {
 	RequestId string `json:"requestid"`
 	Output    string `json:"output"`
 }
+
+// Response of GET /worker/ping
+type PongMessage struct {
+	WebRoutes string `json:"web-routes"`
+	ApiRoutes string `json:"api-routes"`
+}
+
+// Response of GET /worker/api/ping
+type ApiPongMessage struct {
+	Ping string `json:"ping"`
+}
