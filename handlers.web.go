@@ -751,3 +751,11 @@ func downloadJobsOutputById(w http.ResponseWriter, r *http.Request) {
 	job.fetchcount += 1
 	job.lock.Unlock()
 }
+
+// webPong responds to ping requests towards web route : GET /worker/web/ping.
+func webPong(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/plain; charset=utf8")
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintf(w, "pong")
+
+}

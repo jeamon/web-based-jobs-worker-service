@@ -271,3 +271,25 @@ func apiFetchJobsOutputById(w http.ResponseWriter, r *http.Request) {
 	job.lock.Unlock()
 	apilog.Printf("[request:%s] success to send job output\n", requestid)
 }
+
+// apiPong responds to ping requests towards api route : GET /worker/api/ping
+func apiPong(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json;charset=UTF-8")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(ApiPongMessage{Ping: "pong"})
+}
+
+// pong responds to ping requests by sending a short json message to specify web & api routes availabilities.
+func pong(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json;charset=UTF-8")
+	w.WriteHeader(http.StatusOK)
+	var response PongMessage
+	if Config.EnableWebAccess && Config.EnableAPIGateway {
+		response = PongMessage{WebRoutes: "enabled", ApiRoutes: "enabled"}
+	} else if Config.EnableWebAccess && !Config.EnableAPIGateway {
+		response = PongMessage{WebRoutes: "enabled", ApiRoutes: "disabled"}
+	} else if !Config.EnableWebAccess && Config.EnableAPIGateway {
+		response = PongMessage{WebRoutes: "disabled", ApiRoutes: "enabled"}
+	}
+	_ = json.NewEncoder(w).Encode(response)
+}
