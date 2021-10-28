@@ -72,6 +72,8 @@ Below is a summary of available features. This section will be updated as projec
 * capability to specify in config file if Web and/or API URLS should be enabled or disabled
 * capability to download the output dump file of a long running job (scheduled with dump option)
 * user-defined settings option to specify if logs entries and requests id timestamp must use UTC or local TZ
+* embedded websocket/streaming html template file into the executable by leveraging golang <embed> feature
+* capability to check worker liveness (ping/pong) and API/WEB routes availability and pull its settings
 
 
 Please feel free to have a look at the [Web Access](#web-access) and [Rest APIs](#rest-apis) for practical examples.
@@ -85,11 +87,11 @@ This philosophy leads to have a single main package with multiple self-described
 Thus makes it easier to move as you wish to a more garnular packaging approach during codebase refactoring.
 
 * Golang version: 1.16+
-* Golang Native packages / features
+* Heavy usage of Golang Native packages
 
-net/http - context - html/template - io - log - os/exec - encoding/json - errors
-runtime - sync - syscall - regexp - bufio - os/signal - sort - bytes - unicode/utf8
-crypto/tls - crypto/rand - crypto/rsa - crypto/x509 - crypto/x509/pkix - encoding/pem
+**net/http - context - html/template - io - log - os/exec - encoding/json - errors**
+**runtime - sync - syscall - regexp - bufio - os/signal - sort - bytes - unicode/utf8**
+**crypto/tls - crypto/rand - crypto/rsa - crypto/x509 - crypto/x509/pkix - encoding/pem etc.**
 
 * [Gorilla Websocket Package](https://pkg.go.dev/github.com/gorilla/websocket)
 
@@ -205,6 +207,9 @@ $ docker run -d --publish 8080:8080 --name unix-worker --rm unix-worker /bin/sh 
 
 
 * To execute multiple long running remote task (optionally with timeout in mins and stream page style) and use their ids to stream their realtime outputs:
+
+*Regarding the style (CSS), the default foreground/background color is white/black. The default size is 18 pixel. If you want to use hex code of a given color,
+you must replace the (#) by its encoded value (%23). For example, to use #77216F as background you must fill bg=%2377216F*
 	
 	```
 	https://<server-ip-address>:<port>/worker/web/v1/jobs/long/stream/schedule?cmd=<command+argument>&cmd=<command+argument>&timeout=<value>
@@ -213,8 +218,8 @@ $ docker run -d --publish 8080:8080 --name unix-worker --rm unix-worker /bin/sh 
 	
 	[+] On Windows Operating System.
 	```
+	example: https://localhost:8080/worker/web/v1/jobs/long/stream/schedule?cmd=ping+8.8.8.8+-n+500&fg=white&bold=true&size=20&bg=%2377216F
 	example: https://127.0.0.1:8080/worker/web/v1/jobs/long/stream/schedule?cmd=ping+4.4.4.4+-t&cmd=ping+8.8.8.8+-t&timeout=30
-	example: https://127.0.0.1:8080/worker/web/v1/jobs/long/stream/schedule?cmd=netstat+-an+|+findstr+ESTAB&netstat+-an+|+findstr+ESTAB&timeout=15
 	```
 
 	[+] On Linux Operating System.
@@ -232,8 +237,8 @@ $ docker run -d --publish 8080:8080 --name unix-worker --rm unix-worker /bin/sh 
 
 	[+] On Windows or Linux Operating System.
 	```
-	example: https://127.0.0.1:8080/worker/web/v1/jobs/long/output/stream?id=abe478954cef4125&size=20
-	example: https://127.0.0.1:8080/worker/web/v1/jobs/long/output/stream?id=abe478954cef4125&fg=white&bg=#77216F&bold=true
+	example: https://127.0.0.1:8080/worker/web/v1/jobs/long/output/stream?id=abe478954cef4125&size=20&bold=false
+	example: https://127.0.0.1:8080/worker/web/v1/jobs/long/output/stream?id=abe478954cef4125&fg=gree&bg=black&bold=true
 	```
 
 
@@ -431,6 +436,7 @@ $ docker run -d --publish 8080:8080 --name unix-worker --rm unix-worker /bin/sh 
 	```
 
 
+
 * To check the status of all (short and long running or stopped) jobs:
 
 	```
@@ -438,7 +444,20 @@ $ docker run -d --publish 8080:8080 --name unix-worker --rm unix-worker /bin/sh 
 	Response contains a requestid and a list of all jobs full information.
 	```
 
+* To check the liveness of worker service or the availability of API or Web routes:
 
+	```
+	GET /worker/ping
+	GET /worker/web/ping
+	GET /worker/api/ping
+	```
+
+
+* To check get the complete current and in use settings of the worker service:
+
+	```
+	GET /worker/settings
+	```
 
 ## Upcomings
 
@@ -447,7 +466,6 @@ $ docker run -d --publish 8080:8080 --name unix-worker --rm unix-worker /bin/sh 
 * add command line options on worker service to list or delete jobs or dump jobs output.
 * add feature to move worker service into maintenance mode - stop accepting jobs.
 * limit the overall number of jobs scheduling to 10K and make it dynamically configurable.
-* embed websocket html/JS template file into executable by leveraging golang 1.16 feature.
 * refactore logging format by using external library logrus/zerolog for logging into json format.
 * enforce puggeable auth/authz with RBAC and add default root user/password at startup.
 * refactor job with streaming capability to stream over multiple websockets at the same time.
