@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+    <title>streaming job id {{.id}}</title>
+  </head>
+  {{if .bold}}  
+  <body style="font-weight: bold; font-size: {{.size}}px; background-color: {{.bgcolor}}; color: {{.fgcolor}};">
+  {{else}}
+  <body style="font-size: {{.size}}px; background-color: {{.bgcolor}}; color: {{.fgcolor}};">
+  {{end}}
+    <pre>Real-time combined output of job id [{{.id}}]</pre>
+    <pre id="output"></pre>
+    <script type="text/javascript">
+            // const jobid = "{{.id}}";
+            var output = document.getElementById("output");
+            console.log("connecting to websocket server ...");
+            const sock = new WebSocket("wss://{{.server}}/worker/web/v1/jobs/long/output/stream?id={{.id}}");
+            
+            sock.onopen = function() {
+                console.log("websocket connection to server successfully established");
+                // sock.send(id);
+            };
+
+            sock.onmessage = function(event) {
+                // console.log("[rcv] " + event.data);
+                output.textContent += event.data;
+            };
+
+            sock.onerror = function(error) {
+                console.log("websocket connection error - " + error);
+                window.alert("Connection to server failed. Reason " + error.message + ". Reload the page to reconnect.");
+            };
+
+            sock.onclose = function(event) {
+                console.log("websocket connection closed - " + event);
+                if (event.wasClean) {
+                    window.alert("Connection to server closed. Reload the page to reconnect if needed.");
+                } else {
+                    window.alert("Connection to server failed. Check server availability or network connection. Reload the page to reconnect if needed.");
+                }
+            };
+    </script>
+  </body>
+</html>
