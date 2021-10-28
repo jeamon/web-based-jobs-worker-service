@@ -11,6 +11,7 @@ func setupWebServerRoutes(router *http.ServeMux) {
 	// URI to check web & api routes availabilities.
 	if Config.EnableWebAccess {
 		router.HandleFunc("/worker/ping", pong)
+		router.HandleFunc("/worker/settings", getSettingsHandler)
 	}
 
 	// URI to check WEB routes availabilities.
@@ -66,6 +67,7 @@ func setupApiGatewayRoutes(router *http.ServeMux) {
 	// Enabled if web routes are disabled.
 	if !Config.EnableWebAccess {
 		router.HandleFunc("/worker/ping", pong)
+		router.HandleFunc("/worker/settings", getSettingsHandler)
 	}
 
 	// default api request - send apis documentation.

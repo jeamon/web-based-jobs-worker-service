@@ -293,3 +293,10 @@ func pong(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = json.NewEncoder(w).Encode(response)
 }
+
+// getSettingsHandler sends the Config data content. GET /worker/api/ping
+func getSettingsHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json;charset=UTF-8")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(Config)
+}
