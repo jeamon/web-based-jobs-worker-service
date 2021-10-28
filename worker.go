@@ -1,6 +1,7 @@
 package main
 
 import (
+	"embed"
 	"fmt"
 	"html/template"
 	"io/ioutil"
@@ -21,20 +22,39 @@ var globalJobsQueue chan *Job
 var globalJobsResults map[string]*Job
 var mapLock *sync.RWMutex
 
-var tmpl *template.Template
+//go:embed assets/websocket.html
+var streamPageFS embed.FS
+var streamPageTemplate *template.Template
 
-func initializeWorkerSettings() {
-	// loads configuration
+func initializeWorkerSettings() error {
+	var err error
+	log.Println("initializing default folders and worker settings ...")
 
 	mapLock = &sync.RWMutex{}
 	globalJobsQueue = make(chan *Job, Config.MaxJobsQueueBuffer)
 	globalJobsResults = make(map[string]*Job)
+
+	// compile the tempplate from the filesystem.
+	streamPageTemplate, err = template.ParseFS(streamPageFS, "assets/websocket.html")
+	if err != nil {
+		log.Printf("failed to initialize streaming web page template - errmsg: %v\n", err)
+		return err
+	}
 	// compile stream web page template.
-	tmpl = template.Must(template.ParseFiles("websocket.html"))
+	// tmpl = template.Must(template.ParseFiles("websocket.html"))
 
 	// ensure jobs outputs & backups folder are present.
-	createFolder(Config.JobsOutputsFolder)
-	createFolder(Config.JobsOutputsBackupsFolder)
+	err = createFolder(Config.JobsOutputsFolder)
+	if err != nil {
+		log.Printf("failed to ensure jobs outputs folder - errmsg: %v\n", err)
+		return err
+	}
+
+	err = createFolder(Config.JobsOutputsBackupsFolder)
+	if err != nil {
+		log.Printf("failed to ensure jobs outputs backups folder - errmsg: %v\n", err)
+		return err
+	}
 
 	// for linux-based platform lets find the current shell binary path
 	// if environnement shell is set and not empty we use it as default.
@@ -43,6 +63,8 @@ func initializeWorkerSettings() {
 			Config.DefaultLinuxShell = os.Getenv("SHELL")
 		}
 	}
+
+	return nil
 }
 
 // savePID is a function to create new file and put inside the pid value passed.
@@ -101,7 +123,10 @@ func runWorkerService() error {
 	}()
 
 	// init global variables and loads configs.
-	initializeWorkerSettings()
+	err = initializeWorkerSettings()
+	if err != nil {
+		return err
+	}
 
 	// to make sure all goroutines exit before leaving the program.
 	wg := &sync.WaitGroup{}
