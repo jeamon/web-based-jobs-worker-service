@@ -109,25 +109,29 @@ func generateWebRequestID(t time.Time) string {
 }
 
 // createFolder makes sure that <folderPath> is present, and if not creates it.
-func createFolder(folderPath string) {
+func createFolder(folderPath string) error {
 	ok, err := PathExists(folderPath)
 	if ok {
 		if ok, err = IsDir(folderPath); ok && err == nil {
-			return
+			return nil
 		} else {
 			log.Printf("path %q exists but it is not a folder so please check before continue - errmsg : %v\n", folderPath, err)
-			os.Remove(Config.WorkerPidFilePath)
-			os.Exit(1)
+			return err
+			// os.Remove(Config.WorkerPidFilePath)
+			// os.Exit(1)
 		}
 	}
 	// try to create the folder.
 	err = os.MkdirAll(folderPath, 0755)
 	if err != nil {
 		log.Printf("failed to create %q folder - errmsg : %v\n", folderPath, err)
+		return err
 		// try to remove any PID file.
-		os.Remove(Config.WorkerPidFilePath)
-		os.Exit(1)
+		// os.Remove(Config.WorkerPidFilePath)
+		// os.Exit(1)
 	}
+
+	return nil
 }
 
 // resetCompletedJobInfos resets a given job details (only if it has been completed/stopped before) for restarting.
