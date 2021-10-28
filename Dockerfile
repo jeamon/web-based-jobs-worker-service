@@ -23,7 +23,6 @@ RUN go build -o /app/web-worker-service/worker .
 FROM alpine:latest
 
 COPY --from=builder /app/web-worker-service/worker /app/web-worker-service/worker
-COPY --from=builder /app/web-worker-service/websocket.html /app/web-worker-service/websocket.html
 
 # Install the useful curl tool for local testing
 RUN apk --no-cache add curl
