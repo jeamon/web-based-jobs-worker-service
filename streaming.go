@@ -70,7 +70,9 @@ func serveStreamPage(w http.ResponseWriter, r *http.Request) {
 		"bold":    bold,
 		"size":    fontSize,
 	}
-	err := tmpl.Execute(w, info)
+
+	// build the final page and send it.
+	err := streamPageTemplate.Execute(w, info)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		fmt.Fprintln(w, fmt.Sprintf("Sorry, unexpected error occured while rendering the streaming page. Contact the support with below.\n\nRequest ID:%s\nError Message:%s", requestid, err.Error()))
