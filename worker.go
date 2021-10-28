@@ -93,7 +93,7 @@ func runWorkerService() error {
 		return err
 	}
 
-	log.Printf("user [%s] started worker service. [pid: %d]. [ppid: %d]\n", user.Username, os.Getpid(), os.Getppid())
+	log.Printf("started worker service. [user: %s] - [pid: %d] - [ppid: %d]\n", user.Username, os.Getpid(), os.Getppid())
 	// silently remove pid file if deamon exit.
 	defer func() {
 		os.Remove(Config.WorkerPidFilePath)
@@ -127,14 +127,14 @@ func runWorkerService() error {
 	err = startWebServer(exit)
 	// once server stops - wait until all goroutines exit.
 	wg.Wait()
-	log.Printf("stopped all goroutines from worker - pid [%d] - user [%s] - ppid [%d]\n", os.Getpid(), user.Username, os.Getppid())
+	log.Printf("stopped all goroutines of worker service. [pid: %d] - [user: %s] - [ppid: %d]\n", os.Getpid(), user.Username, os.Getppid())
 	return err
 }
 
 // checkWorkerService will read stored PID from the local file and will send a
 // non impact signal 0 toward that process to check if it exists (running) or not.
 func checkWorkerService() (err error) {
-	// default to 0
+
 	var pid int
 	// anonymous function which check final value
 	// of pid variable and display deamon status.
@@ -143,7 +143,7 @@ func checkWorkerService() (err error) {
 			fmt.Println("status: not active")
 			return
 		}
-		fmt.Println("status: active - pid", pid)
+		fmt.Printf("worker service [pid: %d]. status is active\n", pid)
 	}()
 
 	// read the pid from the file.
@@ -156,12 +156,13 @@ func checkWorkerService() (err error) {
 		return err
 	}
 
-	// case for windows platform - use tasklist command.
+	// on windows platform, we use tasklist and findstr to search for the pid.
+	// Because syscall.Signal is not available in Windows.
 	if runtime.GOOS == "windows" {
 		out, err := exec.Command("cmd", "/C", fmt.Sprintf("tasklist | findstr %d", pid)).Output()
 		if err != nil {
 			fmt.Println(err)
-			fmt.Printf("no process with pid %d - removing PID file\n", pid)
+			fmt.Printf("process [pid: %d] does not exist. removing pid file: %s\n", pid, Config.WorkerPidFilePath)
 			os.Remove(Config.WorkerPidFilePath)
 			// set back to 0 so defer function can display inactive status.
 			pid = 0
@@ -185,9 +186,10 @@ func checkWorkerService() (err error) {
 		return err
 	}
 
-	// send dummy signal 0 to that process.
+	// on linux-based platforms, we send a dummy (non impact) signal 0 to that process.
+	// if it responds then it is alive otherwise it is not running.
 	if err = process.Signal(syscall.Signal(0)); err != nil && err == syscall.ESRCH {
-		fmt.Printf("process with pid %d is not running - removing the pid file\n", pid)
+		fmt.Printf("process [pid: %d] is not running. removing pid file: %s\n", pid, Config.WorkerPidFilePath)
 		os.Remove(Config.WorkerPidFilePath)
 		// set back to 0 so defer function can display inactive status.
 		pid = 0
@@ -203,7 +205,7 @@ func stopWorkerService() error {
 	if err != nil {
 		if os.IsNotExist(err) {
 			// the file does not exist.
-			fmt.Printf("cannot find pid file %q to load process ID\n", Config.WorkerPidFilePath)
+			log.Printf("cannot find pid file [%q] to load the worker service pid.\n", Config.WorkerPidFilePath)
 			return nil
 		}
 		return err
@@ -217,10 +219,10 @@ func stopWorkerService() error {
 	// remove the PID file
 	os.Remove(Config.WorkerPidFilePath)
 	if err := process.Kill(); err != nil {
-		fmt.Printf("failed to kill process with ID [%v]\n", pid)
+		log.Printf("failed to kill worker service [pid: %v]\n", pid)
 		return err
 	} else {
-		fmt.Printf("stopped deamon at pid [%v]\n", pid)
+		log.Printf("successfully stopped worker service [pid: %v]\n", pid)
 		return nil
 	}
 }
@@ -249,7 +251,7 @@ func restartWorkerService() error {
 
 	if err := process.Kill(); err != nil {
 		// failed to kill existing process
-		fmt.Printf("failed to kill existing process with ID [%v]\n", pid)
+		fmt.Printf("failed to kill worker service [pid: %v]\n", pid)
 		return err
 	}
 	// succeed to kill existing - so start new.
@@ -260,7 +262,7 @@ func restartWorkerService() error {
 func startWorkerService() error {
 	// check if the deamon is already running.
 	if _, err := os.Stat(Config.WorkerPidFilePath); err == nil {
-		fmt.Printf("deamon is running or %s pid file exists. try to restart.\n", Config.WorkerPidFilePath)
+		fmt.Printf("worker service is already running or the pid file [%s] already exists. try to restart.\n", Config.WorkerPidFilePath)
 		return err
 	}
 
@@ -289,13 +291,13 @@ func startWorkerService() error {
 	if err := savePID(cmd.Process.Pid); err != nil {
 		// try to kill the process
 		if err := cmd.Process.Kill(); err != nil {
-			fmt.Printf("failed to kill the worker service process [%d]\n", cmd.Process.Pid)
+			fmt.Printf("failed to kill the worker service process [pid: %d]\n", cmd.Process.Pid)
 		}
 
 		return err
 	}
 	// speudo deamon started
-	log.Printf("started worker with pid [%d] - ppid was [%d]\n", cmd.Process.Pid, os.Getpid())
+	log.Printf("started worker service [pid: %d] - [ppid: %d]\n", cmd.Process.Pid, os.Getpid())
 
 	// below exit will terminate the group leader (current process)
 	// so once you close the terminal - the session will be terminated

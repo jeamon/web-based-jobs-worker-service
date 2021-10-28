@@ -48,12 +48,10 @@ func handleSignal(exit chan struct{}, wg *sync.WaitGroup) {
 	// block until something comes in.
 	signalType := <-sigch
 	signal.Stop(sigch)
-	fmt.Println("exit command received. exiting...")
-	// perform cleanup action before terminating if needed.
-	fmt.Println("received signal type: ", signalType)
-	// remove PID file
+	log.Println("received exit command [signal: %v]. stopping worker service.", signalType)
+	// perform cleanup action : remove pid file.
 	os.Remove(Config.WorkerPidFilePath)
-	// close quit - so jobs monitor groutine will be notified.
+	// close quit channel, so jobs monitor goroutine will be notified.
 	close(exit)
 	return
 }
