@@ -74,6 +74,7 @@ Below is a summary of available features. This section will be updated as projec
 * user-defined settings option to specify if logs entries and requests id timestamp must use UTC or local TZ
 * embedded websocket/streaming html template file into the executable by leveraging golang <embed> feature
 * capability to check worker liveness (ping/pong) and API/WEB routes availability and pull its settings
+* user-defined timezone to use when displaying job time-related information (submit / start / end datetime).
 
 
 Please feel free to have a look at the [Web Access](#web-access) and [Rest APIs](#rest-apis) for practical examples.
@@ -190,7 +191,7 @@ $ docker run -d --publish 8080:8080 --name unix-worker --rm unix-worker /bin/sh 
 * To execute a long running remote task (optionally with timeout in mins and dumping to file) and get the realtime output:
 	
 	```
-	https://<server-ip-address>:<port>/worker/web/v1/jobs/long/stream/schedule?cmd=<command+argument>&timeout=<value>&dump=<true|false>
+	https://<server-ip-address>:<port>/worker/web/v1/jobs/long/stream/schedule?cmd=<command+argument>&timeout=<value>&dump=<true|false>&timezone=<tz-location>
 	```
 	
 	[+] On Windows Operating System.
@@ -213,13 +214,13 @@ you must replace the (#) by its encoded value (%23). For example, to use #77216F
 	
 	```
 	https://<server-ip-address>:<port>/worker/web/v1/jobs/long/stream/schedule?cmd=<command+argument>&cmd=<command+argument>&timeout=<value>
-	&fg=<foreground-color>&bg=<background-color>&bold=[true|false]&size=<value>
+	&timezone=<tz-location>&fg=<foreground-color>&bg=<background-color>&bold=[true|false]&size=<value>
 	```
 	
 	[+] On Windows Operating System.
 	```
 	example: https://localhost:8080/worker/web/v1/jobs/long/stream/schedule?cmd=ping+8.8.8.8+-n+500&fg=white&bold=true&size=20&bg=%2377216F
-	example: https://127.0.0.1:8080/worker/web/v1/jobs/long/stream/schedule?cmd=ping+4.4.4.4+-t&cmd=ping+8.8.8.8+-t&timeout=30
+	example: https://127.0.0.1:8080/worker/web/v1/jobs/long/stream/schedule?cmd=ping+4.4.4.4+-t&cmd=ping+8.8.8.8+-t&timeout=30&timezone=Europe/Warsaw
 	```
 
 	[+] On Linux Operating System.
@@ -245,12 +246,12 @@ you must replace the (#) by its encoded value (%23). For example, to use #77216F
 * To execute one or multiple short running jobs (optionally with timeout in seconds) and later use their ids to fetch their outputs:
 	
 	```
-	https://<server-ip-address>:<port>/worker/web/v1/jobs/short/schedule?cmd=<command+argument>&cmd=<command+argument>&timeout=<value>
+	https://<server-ip-address>:<port>/worker/web/v1/jobs/short/schedule?cmd=<command+argument>&cmd=<command+argument>&timeout=<value>&timezone=<tz-location>
 	```
 
 	[+] On Windows Operating System.
 	```
-	example: https://127.0.0.1:8080/worker/web/v1/jobs/short/schedule?cmd=systeminfo&cmd=ipconfig+/all&cmd=tasklist
+	example: https://127.0.0.1:8080/worker/web/v1/jobs/short/schedule?cmd=systeminfo&cmd=ipconfig+/all&cmd=tasklist&timezone=Africa/Abidjan
 	example: https://127.0.0.1:8080/worker/web/v1/jobs/short/schedule?cmd=ipconfig+/all
 	```
 
@@ -275,26 +276,26 @@ you must replace the (#) by its encoded value (%23). For example, to use #77216F
 * To check the detailed status of one or multiple submitted jobs:
 	
 	```
-	https://<server-ip-address>:<port>/worker/web/v1/jobs/x/status/check?id=<job-1-id>&id=<job-2-id>
+	https://<server-ip-address>:<port>/worker/web/v1/jobs/x/status/check?id=<job-1-id>&id=<job-2-id>&timezone=<tz-location>
 	```
 
 	[+] On Windows or Linux Operating System.
 	```
-	example: https://127.0.0.1:8080/worker/web/v1/jobs/x/status/check?id=abe478954cef4125&id=cde478910cef4125
+	example: https://127.0.0.1:8080/worker/web/v1/jobs/x/status/check?id=abe478954cef4125&id=cde478910cef4125&&timezone=America/New_York
 	```
 
 
 * To check the status of all (short and long running) submitted jobs:
 	
 	```
-	https://<server-ip-address>:<port>/worker/web/v1/jobs/x/stop/all?order=[asc|desc]
+	https://<server-ip-address>:<port>/worker/web/v1/jobs/x/stop/all?timezone=<tz-location>&order=[asc|desc]
 	```
 
 	[+] On Windows or Linux Operating System.
 	```
-	example: https://127.0.0.1:8080/worker/web/v1/jobs/x/status/check/all
-	example: https://127.0.0.1:8080/worker/web/v1/jobs/x/status/check/all?order=asc
-	example: https://127.0.0.1:8080/worker/web/v1/jobs/x/status/check/all?order=desc
+	example: https://127.0.0.1:8080/worker/web/v1/jobs/x/status/check/all?&timezone=Africa/Abidjan
+	example: https://127.0.0.1:8080/worker/web/v1/jobs/x/status/check/all?order=asc?&timezone=Africa/Dublin
+	example: https://127.0.0.1:8080/worker/web/v1/jobs/x/status/check/all?order=desc&timezone=Asia/Dubai
 	```
 	
 
@@ -368,7 +369,8 @@ you must replace the (#) by its encoded value (%23). For example, to use #77216F
 * To execute one or multiple short or long running jobs:
 	
 	```
-	POST /worker/api/v1/jobs/schedule/
+	POST /worker/api/v1/jobs/schedule/?timezone=<timezone-location>
+	POST /worker/api/v1/jobs/schedule?timezone=<timezone-location>
     Content-Type: application/json
 	Payload : {"jobs":[{job-parameters},...{job-parameters}]} - List of jobs with below fields.
 	Parameters:
@@ -429,7 +431,7 @@ you must replace the (#) by its encoded value (%23). For example, to use #77216F
 * To check the status of one or multiple short or long running jobs:
 
 	```
-	GET /worker/api/v1/jobs/status?id=<jobID>&id=<jobID>&id=<jobID>&id=<jobID>
+	GET /worker/api/v1/jobs/status?id=<jobID>&id=<jobID>&id=<jobID>&id=<jobID>&timezone=<timezone-location>
 	Parameters:
 		<jobID> 	String 	[Required] valid 16 hexa characters identifying a job.
 	Response contains a requestid and a list of these jobs full information.
@@ -440,7 +442,7 @@ you must replace the (#) by its encoded value (%23). For example, to use #77216F
 * To check the status of all (short and long running or stopped) jobs:
 
 	```
-	GET /worker/api/v1/jobs/status/
+	GET /worker/api/v1/jobs/status/?timezone=<timezone-location>
 	Response contains a requestid and a list of all jobs full information.
 	```
 
@@ -469,7 +471,6 @@ you must replace the (#) by its encoded value (%23). For example, to use #77216F
 * refactore logging format by using external library logrus/zerolog for logging into json format.
 * enforce puggeable auth/authz with RBAC and add default root user/password at startup.
 * refactor job with streaming capability to stream over multiple websockets at the same time.
-* display submit/start/end per client browser timezone and send them as unixnano in api response.
 * propagate web request or api call id into jobs processing logs.
 * enforce per process resources limitations (cpu and memory usage).
 
