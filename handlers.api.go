@@ -11,13 +11,19 @@ import (
 	"time"
 )
 
-// apiScheduleJobs schedules for processing a list of jobs submitted. POST /worker/api/v1/jobs/schedule/
+// apiScheduleJobs schedules a list of jobs for processing. POST /worker/api/v1/jobs/schedule?timezone=<tz>
 func apiScheduleJobs(w http.ResponseWriter, r *http.Request) {
 
 	requestid := getFromRequest(r, "requestid")
 	if r.Method != "POST" {
 		SendErrorMessage(w, requestid, "Failed to schedule job(s). Invalid request method.", http.StatusMethodNotAllowed)
 		return
+	}
+
+	timeLocation := Config.DefaultJobsInfosTimeLocation
+	// retrieve timezone value and convert it to time location.
+	if tloc, err := time.LoadLocation(r.URL.Query().Get("timezone")); err == nil {
+		timeLocation = tloc
 	}
 
 	var err error
@@ -110,7 +116,7 @@ func apiScheduleJobs(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// add scheduled job details to response list.
-		finalJobsInfos = append(finalJobsInfos, job.scheduledInfos())
+		finalJobsInfos = append(finalJobsInfos, job.scheduledInfos(timeLocation))
 		// register job to global map results so user can check status while job being executed.
 		mapLock.Lock()
 		globalJobsResults[job.id] = job

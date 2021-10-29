@@ -225,6 +225,7 @@ func scheduleLongJobsWithStreaming(w http.ResponseWriter, r *http.Request) {
 	memlimit := Config.MemoryLimitDefaultMegaBytes
 	cpulimit := Config.CpuLimitDefaultPercentage
 	timeout := Config.LongJobTimeout
+	timeLocation := Config.DefaultJobsInfosTimeLocation
 	dump := false
 
 	// extract only first value of mem and cpu query string. they cannot be greater than maximum values.
@@ -238,6 +239,11 @@ func scheduleLongJobsWithStreaming(w http.ResponseWriter, r *http.Request) {
 	// retreive timeout parameter value and consider it if higher than 0.
 	if t, err := strconv.Atoi(query.Get("timeout")); err == nil && t > 0 && t <= Config.LongJobTimeout {
 		timeout = t
+	}
+
+	// retrieve timezone value and convert it to time location.
+	if tloc, err := time.LoadLocation(query.Get("timezone")); err == nil {
+		timeLocation = tloc
 	}
 
 	if len(cmds) == 1 {
@@ -345,7 +351,7 @@ func scheduleLongJobsWithStreaming(w http.ResponseWriter, r *http.Request) {
 		globalJobsQueue <- job
 		jobslog.Printf("[%s] [%05d] scheduled the processing of the job\n", job.id, job.pid)
 		// stream this scheduled job details as a row.
-		fmt.Fprintf(w, job.formatScheduledInfosAsTableRow(i+1))
+		fmt.Fprintf(w, job.formatScheduledInfosAsTableRow(i+1, timeLocation))
 		if ok {
 			f.Flush()
 		}
@@ -370,6 +376,7 @@ func scheduleLongJobsWithDumping(w http.ResponseWriter, r *http.Request) {
 	memlimit := Config.MemoryLimitDefaultMegaBytes
 	cpulimit := Config.CpuLimitDefaultPercentage
 	timeout := Config.LongJobTimeout
+	timeLocation := Config.DefaultJobsInfosTimeLocation
 	// extract only first value of mem and cpu query string. they cannot be greater than maximum values.
 	if m, err := strconv.Atoi(query.Get("mem")); err == nil && m > 0 && m <= Config.MemoryLimitMaxMegaBytes {
 		memlimit = m
@@ -381,6 +388,11 @@ func scheduleLongJobsWithDumping(w http.ResponseWriter, r *http.Request) {
 	// retreive timeout parameter value and consider it if higher than 0.
 	if t, err := strconv.Atoi(query.Get("timeout")); err == nil && t > 0 && t <= Config.LongJobTimeout {
 		timeout = t
+	}
+
+	// retrieve timezone value and convert it to time location.
+	if tloc, err := time.LoadLocation(query.Get("timezone")); err == nil {
+		timeLocation = tloc
 	}
 
 	// multiple jobs so schedule all of them and send summary.
@@ -427,7 +439,7 @@ func scheduleLongJobsWithDumping(w http.ResponseWriter, r *http.Request) {
 		globalJobsQueue <- job
 		jobslog.Printf("[%s] [%05d] scheduled the processing of the job\n", job.id, job.pid)
 		// stream this scheduled job details as a row.
-		fmt.Fprintf(w, job.formatScheduledInfosAsTableRow(i+1))
+		fmt.Fprintf(w, job.formatScheduledInfosAsTableRow(i+1, timeLocation))
 		if ok {
 			f.Flush()
 		}

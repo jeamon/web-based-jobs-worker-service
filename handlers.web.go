@@ -374,6 +374,7 @@ func scheduleShortRunningJobs(w http.ResponseWriter, r *http.Request) {
 	memlimit := Config.MemoryLimitDefaultMegaBytes
 	cpulimit := Config.CpuLimitDefaultPercentage
 	timeout := Config.ShortJobTimeout
+	timeLocation := Config.DefaultJobsInfosTimeLocation
 	// extract only first value of mem and cpu query string. they cannot be greater than maximum values.
 	if m, err := strconv.Atoi(query.Get("mem")); err == nil && m > 0 && m <= Config.MemoryLimitMaxMegaBytes {
 		memlimit = m
@@ -382,10 +383,16 @@ func scheduleShortRunningJobs(w http.ResponseWriter, r *http.Request) {
 	if c, err := strconv.Atoi(query.Get("cpu")); err == nil && c > 0 && c <= Config.CpuLimitMaxPercentage {
 		cpulimit = c
 	}
-	// retreive timeout parameter value and consider it if higher than 0.
+	// retrieve timeout parameter value and consider it if higher than 0.
 	if t, err := strconv.Atoi(query.Get("timeout")); err == nil && t > 0 && t <= Config.ShortJobTimeout {
 		timeout = t
 	}
+
+	// retrieve timezone value and convert it to time location.
+	if tloc, err := time.LoadLocation(query.Get("timezone")); err == nil {
+		timeLocation = tloc
+	}
+
 	w.WriteHeader(200)
 	w.Write([]byte("\n[+] find below some details of the jobs submitted\n\n"))
 
@@ -426,7 +433,7 @@ func scheduleShortRunningJobs(w http.ResponseWriter, r *http.Request) {
 		globalJobsQueue <- job
 		jobslog.Printf("[%s] [%05d] scheduled the processing of the job\n", job.id, job.pid)
 		// stream this scheduled job details as a row.
-		fmt.Fprintf(w, job.formatScheduledInfosAsTableRow(i+1))
+		fmt.Fprintf(w, job.formatScheduledInfosAsTableRow(i+1, timeLocation))
 		if ok {
 			f.Flush()
 		}

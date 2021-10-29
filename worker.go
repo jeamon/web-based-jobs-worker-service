@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"sync"
 	"syscall"
+	"time"
 )
 
 // buffered (maxJobs) channel to hold submitted (*job).
@@ -40,8 +41,6 @@ func initializeWorkerSettings() error {
 		log.Printf("failed to initialize streaming web page template - errmsg: %v\n", err)
 		return err
 	}
-	// compile stream web page template.
-	// tmpl = template.Must(template.ParseFiles("websocket.html"))
 
 	// ensure jobs outputs & backups folder are present.
 	err = createFolder(Config.JobsOutputsFolder)
@@ -53,6 +52,12 @@ func initializeWorkerSettings() error {
 	err = createFolder(Config.JobsOutputsBackupsFolder)
 	if err != nil {
 		log.Printf("failed to ensure jobs outputs backups folder - errmsg: %v\n", err)
+		return err
+	}
+
+	Config.DefaultJobsInfosTimeLocation, err = time.LoadLocation(Config.DefaultJobsInfosTimezone)
+	if err != nil {
+		log.Printf("failed to load and convert default timezone value to time location - errmsg: %v\n", err)
 		return err
 	}
 

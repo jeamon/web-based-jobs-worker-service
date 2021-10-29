@@ -73,8 +73,10 @@ func setupApiGatewayRoutes(router *http.ServeMux) {
 	// default api request - send apis documentation.
 	// router.HandleFunc("/worker/api/v1/docs", webV1Help)
 
-	// expected request : POST /worker/api/v1/jobs/schedule/
+	// expected request : POST /worker/api/v1/jobs/schedule/?timezone=<tz>
+	// expected request : POST /worker/api/v1/jobs/schedule?timezone=<tz>
 	router.HandleFunc("/worker/api/v1/jobs/schedule/", apiScheduleJobs)
+	router.HandleFunc("/worker/api/v1/jobs/schedule", apiScheduleJobs)
 
 	// expected request : GET /worker/api/v1/jobs/status?id=<jobid>
 	router.HandleFunc("/worker/api/v1/jobs/status", apiCheckJobsStatusById)

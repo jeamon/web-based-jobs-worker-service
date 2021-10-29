@@ -200,7 +200,7 @@ func SendErrorMessage(w http.ResponseWriter, requestid string, message string, c
 }
 
 // scheduledInfos Job method to returns essential details once a job is just scheduled.
-func (job *Job) scheduledInfos() JobScheduledInfos {
+func (job *Job) scheduledInfos(location *time.Location) JobScheduledInfos {
 	job.lock.RLock()
 	info := JobScheduledInfos{
 		Id:         job.id,
@@ -211,7 +211,7 @@ func (job *Job) scheduledInfos() JobScheduledInfos {
 		Timeout:    job.timeout,
 		Stream:     job.stream,
 		Dump:       job.dump,
-		SubmitTime: (job.submittime).Format("2006-01-02 15:04:05"),
+		SubmitTime: (job.submittime).In(location).Format("2006-01-02 15:04:05"),
 		StatusLink: fmt.Sprintf("https://%s:%s/worker/api/v1/jobs/status?id=%s", Config.HttpsServerHost, Config.HttpsServerPort, job.id),
 	}
 	job.lock.RUnlock()
@@ -344,7 +344,7 @@ func (job *Job) formatStatusAsTableRow(i int, start, end, sizeFormat string) str
 // formatJobsScheduledTableHeaders constructs and returns the headers of the scheduled jobs summary table.
 func formatJobsScheduledTableHeaders() string {
 	var sb strings.Builder
-	title := fmt.Sprintf("|%-4s | %-18s | %-5s | %-6s | %-5s | %-5s | %-6s | %-7s | %-20s | %-30s |", "Nb", "Job ID", "Long", "Stream", "Dump", "Mem", "CPU%%", "Timeout", "Submitted At [UTC]", "Command Syntax")
+	title := fmt.Sprintf("|%-4s | %-18s | %-5s | %-6s | %-5s | %-5s | %-6s | %-7s | %-20s | %-30s |", "Nb", "Job ID", "Long", "Stream", "Dump", "Mem", "CPU%%", "Timeout", "Submitted At", "Command Syntax")
 	// minus 1 since CPU percentage symbol was escaped (it counts 1 word in reality).
 	sb.WriteString(strings.Repeat("=", len(title)-1))
 	sb.WriteByte('\n')
@@ -355,9 +355,9 @@ func formatJobsScheduledTableHeaders() string {
 }
 
 // formatScheduledInfosAsTableRow constructs and returns a given row content for the scheduled jobs summary table.
-func (job *Job) formatScheduledInfosAsTableRow(i int) string {
+func (job *Job) formatScheduledInfosAsTableRow(i int, location *time.Location) string {
 	var sb strings.Builder
-	fmt.Fprintf(&sb, "|%04d | %-18s | %-5v | %-6v | %-5v | %-5d | %-5d | %-7d | %-20v | %-30s |", i, job.id, job.islong, job.stream, job.dump, job.memlimit, job.cpulimit, job.timeout, (job.submittime).Format("2006-01-02 15:04:05"), truncateSyntax(job.task, 30))
+	fmt.Fprintf(&sb, "|%04d | %-18s | %-5v | %-6v | %-5v | %-5d | %-5d | %-7d | %-20v | %-30s |", i, job.id, job.islong, job.stream, job.dump, job.memlimit, job.cpulimit, job.timeout, (job.submittime.In(location)).Format("2006-01-02 15:04:05"), truncateSyntax(job.task, 30))
 	sb.WriteByte('\n')
 	fmt.Fprintf(&sb, "+%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+-%s-+\n", Dashs(4), Dashs(18), Dashs(5), Dashs(6), Dashs(5), Dashs(5), Dashs(5), Dashs(7), Dashs(20), Dashs(30))
 	return sb.String()
