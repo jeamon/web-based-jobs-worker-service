@@ -236,20 +236,20 @@ func (job *Job) scheduledInfos(location *time.Location) JobScheduledInfos {
 }
 
 // collectStatusInfos Job method to returns full status details a job.
-func (job *Job) collectStatusInfos() JobStatusInfos {
+func (job *Job) collectStatusInfos(location *time.Location) JobStatusInfos {
 	var start, end, sizeFormat string
 	job.lock.RLock()
 	// format time display for zero time values.
 	if (job.starttime).IsZero() {
 		start = "N/A"
 	} else {
-		start = (job.starttime).Format("2006-01-02 15:04:05")
+		start = (job.starttime).In(location).Format("2006-01-02 15:04:05")
 	}
 
 	if (job.endtime).IsZero() {
 		end = "N/A"
 	} else {
-		end = (job.endtime).Format("2006-01-02 15:04:05")
+		end = (job.endtime).In(location).Format("2006-01-02 15:04:05")
 	}
 
 	if !job.islong {
@@ -283,7 +283,7 @@ func (job *Job) collectStatusInfos() JobStatusInfos {
 		MemLimit:    job.memlimit,
 		CpuLimit:    job.cpulimit,
 		Timeout:     job.timeout,
-		SubmitTime:  (job.submittime).Format("2006-01-02 15:04:05"),
+		SubmitTime:  (job.submittime).In(location).Format("2006-01-02 15:04:05"),
 		StartTime:   start,
 		EndTime:     end,
 	}

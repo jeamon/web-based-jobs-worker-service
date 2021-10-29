@@ -163,6 +163,12 @@ func apiCheckJobsStatusById(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	timeLocation := Config.DefaultJobsInfosTimeLocation
+	// retrieve timezone value and convert it to time location.
+	if tloc, err := time.LoadLocation(query.Get("timezone")); err == nil {
+		timeLocation = tloc
+	}
+
 	// retreive each job status and send.
 	unknownIds := make([]string, 0)
 	var jobsStatusInfos []JobStatusInfos
@@ -177,7 +183,7 @@ func apiCheckJobsStatusById(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		// add job status details to response list.
-		jobsStatusInfos = append(jobsStatusInfos, job.collectStatusInfos())
+		jobsStatusInfos = append(jobsStatusInfos, job.collectStatusInfos(timeLocation))
 	}
 	mapLock.RUnlock()
 
@@ -194,7 +200,7 @@ func apiCheckJobsStatusById(w http.ResponseWriter, r *http.Request) {
 }
 
 // apiCheckAllJobsStatus sends all jobs full current details.
-// GET /worker/api/v1/jobs/status/
+// GET /worker/api/v1/jobs/status/?timezone=<tz>
 func apiCheckAllJobsStatus(w http.ResponseWriter, r *http.Request) {
 
 	requestid := getFromRequest(r, "requestid")
@@ -203,13 +209,19 @@ func apiCheckAllJobsStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	timeLocation := Config.DefaultJobsInfosTimeLocation
+	// retrieve timezone value and convert it to time location.
+	if tloc, err := time.LoadLocation(r.URL.Query().Get("timezone")); err == nil {
+		timeLocation = tloc
+	}
+
 	// retreive each job status and send.
 	var jobsStatusInfos []JobStatusInfos
 
 	mapLock.RLock()
 	for _, job := range globalJobsResults {
 		// add job status details to response list.
-		jobsStatusInfos = append(jobsStatusInfos, job.collectStatusInfos())
+		jobsStatusInfos = append(jobsStatusInfos, job.collectStatusInfos(timeLocation))
 	}
 	mapLock.RUnlock()
 
