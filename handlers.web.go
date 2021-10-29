@@ -128,7 +128,7 @@ func instantCommandExecutor(w http.ResponseWriter, r *http.Request) {
 }
 
 // checkJobsStatusById display a summary table of the status of one or multiple jobs based
-// on their ids. GET /worker/web/v1/jobs/x/status/check?id=<jobid>&id=<jobid>.
+// on their ids. GET /worker/web/v1/jobs/x/status/check?id=<jobid>&id=<jobid>&timezone=<tz>
 func checkJobsStatusById(w http.ResponseWriter, r *http.Request) {
 	// try to setup the response as not buffered data. if succeeds it will be used to flush.
 	f, ok := w.(http.Flusher)
@@ -165,6 +165,12 @@ func checkJobsStatusById(w http.ResponseWriter, r *http.Request) {
 	i := 0
 	var errorsMessages string
 	var start, end, sizeFormat string
+	timeLocation := Config.DefaultJobsInfosTimeLocation
+	// retrieve timezone value and convert it to time location.
+	if tloc, err := time.LoadLocation(query.Get("timezone")); err == nil {
+		timeLocation = tloc
+	}
+
 	mapLock.RLock()
 	for _, id := range ids {
 
@@ -180,13 +186,13 @@ func checkJobsStatusById(w http.ResponseWriter, r *http.Request) {
 		if (job.starttime).IsZero() {
 			start = "N/A"
 		} else {
-			start = (job.starttime).Format("2006-01-02 15:04:05")
+			start = (job.starttime).In(timeLocation).Format("2006-01-02 15:04:05")
 		}
 
 		if (job.endtime).IsZero() {
 			end = "N/A"
 		} else {
-			end = (job.endtime).Format("2006-01-02 15:04:05")
+			end = (job.endtime).In(timeLocation).Format("2006-01-02 15:04:05")
 		}
 
 		if !job.islong {
@@ -205,7 +211,7 @@ func checkJobsStatusById(w http.ResponseWriter, r *http.Request) {
 			sizeFormat = "N/A"
 		}
 		// stream this job status as a row.
-		fmt.Fprintf(w, job.formatStatusAsTableRow(i, start, end, sizeFormat))
+		fmt.Fprintf(w, job.formatStatusAsTableRow(i, timeLocation, start, end, sizeFormat))
 		if ok {
 			f.Flush()
 		}
@@ -219,7 +225,7 @@ func checkJobsStatusById(w http.ResponseWriter, r *http.Request) {
 }
 
 // getAllJobsStatus display all jobs details by sorting (either in ascending or descending) them based on submitted time
-// then started time and then ended time. GET /worker/web/v1/jobs/x/status/check/all?order=asc|desc.
+// then started time and then ended time. GET /worker/web/v1/jobs/x/status/check/all?timezone=<tz>&order=asc|desc.
 func getAllJobsStatus(w http.ResponseWriter, r *http.Request) {
 	// try to setup the response as not buffered data. if succeeds it will be used to flush.
 	f, ok := w.(http.Flusher)
@@ -284,19 +290,25 @@ func getAllJobsStatus(w http.ResponseWriter, r *http.Request) {
 	// loop over slice of jobs and send each job's status.
 	i := 0
 	var start, end, sizeFormat string
+	timeLocation := Config.DefaultJobsInfosTimeLocation
+	// retrieve timezone value and convert it to time location.
+	if tloc, err := time.LoadLocation(r.URL.Query().Get("timezone")); err == nil {
+		timeLocation = tloc
+	}
+
 	for _, job := range jobs {
 		i += 1
 		// format time display for zero time values.
 		if (job.starttime).IsZero() {
 			start = "N/A"
 		} else {
-			start = (job.starttime).Format("2006-01-02 15:04:05")
+			start = (job.starttime.In(timeLocation)).Format("2006-01-02 15:04:05")
 		}
 
 		if (job.endtime).IsZero() {
 			end = "N/A"
 		} else {
-			end = (job.endtime).Format("2006-01-02 15:04:05")
+			end = (job.endtime.In(timeLocation)).Format("2006-01-02 15:04:05")
 		}
 
 		if !job.islong {
@@ -315,7 +327,7 @@ func getAllJobsStatus(w http.ResponseWriter, r *http.Request) {
 			sizeFormat = "N/A"
 		}
 		// stream this job status as a row.
-		fmt.Fprintf(w, job.formatStatusAsTableRow(i, start, end, sizeFormat))
+		fmt.Fprintf(w, job.formatStatusAsTableRow(i, timeLocation, start, end, sizeFormat))
 		if ok {
 			f.Flush()
 		}
