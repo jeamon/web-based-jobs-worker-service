@@ -26,9 +26,9 @@ func setupWebServerRoutes(router *http.ServeMux) {
 	// expected request : /worker/web/v1/jobs/short/schedule?cmd=<task-syntax>
 	router.HandleFunc("/worker/web/v1/jobs/short/schedule", scheduleShortRunningJobs)
 
-	// expected request : /worker/web/v1/jobs/x/status/check?id=<jobid>
+	// expected request : /worker/web/v1/jobs/x/status/check?id=<jobid>&timezone=<tz>
 	router.HandleFunc("/worker/web/v1/jobs/x/status/check", checkJobsStatusById)
-	// expected request : /worker/web/v1/jobs/x/status/check/all?order=asc|desc
+	// expected request : /worker/web/v1/jobs/x/status/check/all?timezone=<tz>&order=asc|desc
 	router.HandleFunc("/worker/web/v1/jobs/x/status/check/all", getAllJobsStatus)
 
 	// expected format : /worker/web/v1/jobs/short/output/fetch?id=<jobid>
@@ -78,9 +78,9 @@ func setupApiGatewayRoutes(router *http.ServeMux) {
 	router.HandleFunc("/worker/api/v1/jobs/schedule/", apiScheduleJobs)
 	router.HandleFunc("/worker/api/v1/jobs/schedule", apiScheduleJobs)
 
-	// expected request : GET /worker/api/v1/jobs/status?id=<jobid>
+	// expected request : GET /worker/api/v1/jobs/status?id=<jobid>&timezone=<tz>
 	router.HandleFunc("/worker/api/v1/jobs/status", apiCheckJobsStatusById)
-	// expected request : GET /worker/api/v1/jobs/status/
+	// expected request : GET /worker/api/v1/jobs/status/?timezone=<tz>
 	router.HandleFunc("/worker/api/v1/jobs/status/", apiCheckAllJobsStatus)
 
 	// expected request : GET /worker/api/v1/jobs/fetch?id=<jobid>
