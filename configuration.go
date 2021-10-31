@@ -57,6 +57,7 @@ type Configuration struct {
 	EnableLogsTimestampInUTC         bool           `json:"enable_logs_timestamp_in_utc"`         // if log entries & requests id datetime must be in UTC or local timezone.
 	DefaultJobsInfosTimezone         string         `json:"default_jobs_infos_timezone"`          // if user doesn't define, use this timezone when displaying job infos.
 	DefaultJobsInfosTimeLocation     *time.Location `json:"-"`                                    // value of <DefaultJobsInfosTimezone> to time location. Not saved in json config file.
+	LinuxWorkerMaxOpenFiles          uint64         `json:"linux_worker_max_open_files"`          // maximum number of file descriptors that may hold open during execution on linux.
 }
 
 // config filename to be used to setup the worker service.
@@ -111,6 +112,7 @@ var defaultConfig = Configuration{
 	JobsOutputsBackupsFolder:         "./backups",
 	EnableLogsTimestampInUTC:         false,
 	DefaultJobsInfosTimezone:         "UTC",
+	LinuxWorkerMaxOpenFiles:          1000000,
 }
 
 // dumpDefaultConfig is triggered when passed config file is not found or erroned. It loads
