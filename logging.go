@@ -107,5 +107,6 @@ func setupLoggers() {
 	}
 	jobslog = log.New(jobslogfile, "", log.LstdFlags|log.Lshortfile)
 
-	log.Println("logs folder and all log files successfully created.")
+	log.Printf("created logs folder and files <%s> <%s> <%s> <%s>.\n", Config.WebRequestsLogFile,
+		Config.ApiRequestsLogFile, Config.JobsProcessLogFile, Config.JobsDeletionLogFile)
 }

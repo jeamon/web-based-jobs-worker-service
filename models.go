@@ -46,7 +46,8 @@ type ApiErrorMessage struct {
 	RequestId string `json:"requestid"`
 }
 
-// POST /worker/api/v1/jobs/schedule
+// POST /worker/api/v1/jobs/schedule?timezone=<tz-value>
+// POST /worker/api/v1/jobs/schedule/?timezone=<tz-value>
 type RequestJobsSchedule struct {
 	Jobs []JobScheduleModel `json:"jobs"`
 }
