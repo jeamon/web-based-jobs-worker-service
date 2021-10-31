@@ -68,6 +68,8 @@ func initializeWorkerSettings() error {
 			Config.DefaultLinuxShell = os.Getenv("SHELL")
 		}
 	}
+	// best effort to check & enforce if needed the max number of open files on linux.
+	enforceMaxOpenFiles()
 
 	return nil
 }
