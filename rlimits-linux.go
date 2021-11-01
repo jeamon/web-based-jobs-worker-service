@@ -1,9 +1,9 @@
-//go:build !windows
-// +build !windows
+//go:build linux || freebsd
+// +build linux freebsd
 
 package main
 
-// @rlimits-linux contains function to enforce the maximum number of file descriptors
+// @rlimits-linux.go contains function to enforce the maximum number of file descriptors
 // that may hold open during execution on linux. This max value is defined into settings
 // with field <LinuxWorkerMaxOpenFiles>. Please, note that is a best effort function so
 // the program will not stop if it fails to enforce this resource limitation.
