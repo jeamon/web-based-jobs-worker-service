@@ -75,6 +75,7 @@ Below is a summary of available features. This section will be updated as projec
 * embedded websocket/streaming html template file into the executable by leveraging golang <embed> feature
 * capability to check worker liveness (ping/pong) and API/WEB routes availability and pull its settings
 * user-defined timezone to use when displaying job time-related information (submit / start / end datetime).
+* capability to enforce the maximum number of open files the worker can hold when running on unix-like OSes. 
 
 
 Please feel free to have a look at the [Web Access](#web-access) and [Rest APIs](#rest-apis) for practical examples.
@@ -100,7 +101,7 @@ Thus makes it easier to move as you wish to a more garnular packaging approach d
 
 ## Setup
 
-On Windows, Linux macOS, and FreeBSD you will be able to download the pre-built binaries once available.
+On Windows, Linux, macOS and FreeBSD you will be able to download the pre-built binaries once available.
 If your system has [Go >= 1.16+](https://golang.org/dl/) you can pull the codebase and build from the source.
 
 
@@ -473,6 +474,8 @@ you must replace the (#) by its encoded value (%23). For example, to use #77216F
 * refactor job with streaming capability to stream over multiple websockets at the same time.
 * propagate web request or api call id into jobs processing logs.
 * enforce per process resources limitations (cpu and memory usage).
+* add web and api to delete one or multiple jobs (stop if running or backup their output if done).
+* add web and api routes to fetch the global health and diagnostics of the worker service.
 
 
 ## Contribution
