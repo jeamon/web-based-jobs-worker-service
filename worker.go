@@ -116,6 +116,7 @@ func getPID() (pid int, err error) {
 
 // runWorkerService is the core function to spin up the worker and all its background services.
 func runWorkerService() error {
+	runtime.GOMAXPROCS(runtime.NumCPU())
 	user, err := user.Current()
 	if err != nil {
 		log.Printf("failed to retrieve owner name of this worker process - errmsg: %v", err)
@@ -191,7 +192,7 @@ func checkWorkerService() (err error) {
 	// on windows platform, we use tasklist and findstr to search for the pid.
 	// Because syscall.Signal is not available in Windows.
 	if runtime.GOOS == "windows" {
-		out, err := exec.Command("cmd", "/C", fmt.Sprintf("tasklist | findstr %d", pid)).Output()
+		out, err := exec.Command("cmd", "/C", fmt.Sprintf("tasklist /FI \"PID eq %d\" | findstr %d", pid, pid)).Output()
 		if err != nil {
 			fmt.Println(err)
 			fmt.Printf("process [pid: %d] does not exist. removing pid file: %s\n", pid, Config.WorkerPidFilePath)
@@ -240,18 +241,43 @@ func stopWorkerService() error {
 			log.Printf("cannot find pid file [%q] to load the worker service pid.\n", Config.WorkerPidFilePath)
 			return nil
 		}
+		log.Printf("cannot retrieve the pid of the worker service. check if [%q] is present and there is worker process with the pid.\n", Config.WorkerPidFilePath)
 		return err
 	}
 
 	// try to locate the process.
 	process, err := os.FindProcess(pid)
 	if err != nil {
+		log.Printf("cannot find a running worker process [pid: %v]\n", pid)
+		if runtime.GOOS == "windows" {
+			// on windows only platforms.
+			log.Printf("1/ Open the windows console with administrator privileges")
+			log.Printf("2/ check if the worker is running with <tasklist /FI \"PID eq %v\">", pid)
+			log.Printf("3/ if it is running, try to force stop it with <taskkill /F /PID %v /T>", pid)
+		} else {
+			// any other unix-like OSes.
+			log.Printf("1/ Open the console with privileges to view & stop process")
+			log.Printf("2/ check if the worker is running with <ps -p %v>", pid)
+			log.Printf("3/ if it is running, try to stop it with <kill -9 %v>", pid)
+		}
 		return err
 	}
 	// remove the PID file
 	os.Remove(Config.WorkerPidFilePath)
 	if err := process.Kill(); err != nil {
 		log.Printf("failed to kill worker service [pid: %v]\n", pid)
+		// some tips to check and stop the worker process manually.
+		if runtime.GOOS == "windows" {
+			// on windows only platforms.
+			log.Printf("1/ Open the windows console with administrator privileges")
+			log.Printf("2/ check if the worker is running with <tasklist /FI \"PID eq %v\">", pid)
+			log.Printf("3/ if it is running, try to force stop it with <taskkill /F /PID %v /T>", pid)
+		} else {
+			// any other unix-like OSes.
+			log.Printf("1/ Open the console with privileges to view & stop process")
+			log.Printf("2/ check if the worker is running with <ps -p %v>", pid)
+			log.Printf("3/ if it is running, try to stop it with <kill -9 %v>", pid)
+		}
 		return err
 	} else {
 		log.Printf("successfully stopped worker service [pid: %v]\n", pid)
