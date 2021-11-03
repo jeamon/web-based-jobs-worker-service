@@ -43,7 +43,7 @@ func handleSignal(exit chan struct{}, wg *sync.WaitGroup) {
 	defer wg.Done()
 	sigch := make(chan os.Signal, 1)
 	signal.Notify(sigch, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGKILL,
-		syscall.SIGTERM, syscall.SIGHUP, os.Interrupt, os.Kill)
+		syscall.SIGTERM, syscall.SIGHUP, os.Interrupt, os.Kill, syscall.SIGABRT)
 
 	// block until something comes in.
 	signalType := <-sigch
@@ -57,8 +57,6 @@ func handleSignal(exit chan struct{}, wg *sync.WaitGroup) {
 }
 
 func main() {
-
-	runtime.GOMAXPROCS(runtime.NumCPU())
 
 	if len(os.Args) != 2 {
 		// returned the program name back since someone could have
@@ -95,7 +93,7 @@ func main() {
 	}
 
 	if err != nil {
-		fmt.Println(option, "error:", err)
+		log.Println(option, "error:", err)
 		os.Exit(1)
 	}
 
