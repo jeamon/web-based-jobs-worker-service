@@ -42,5 +42,6 @@
 	"jobs_outputs_backups_folder": "./backups",
 	"enable_logs_timestamp_in_utc": false,
 	"default_jobs_infos_timezone": "UTC",
-	"linux_worker_max_open_files": 1000000
+	"linux_worker_max_open_files": 1000000,
+	"enable_online_diagnostics": false
 }

@@ -58,6 +58,7 @@ type Configuration struct {
 	DefaultJobsInfosTimezone         string         `json:"default_jobs_infos_timezone"`          // if user doesn't define, use this timezone when displaying job infos.
 	DefaultJobsInfosTimeLocation     *time.Location `json:"-"`                                    // value of <DefaultJobsInfosTimezone> to time location. Not saved in json config file.
 	LinuxWorkerMaxOpenFiles          uint64         `json:"linux_worker_max_open_files"`          // maximum number of file descriptors that may hold open during execution on linux.
+	EnableOnlineDiagnostics          bool           `json:"enable_online_diagnostics"`            // web route to pull runtime statistics for diagnostics should be setup or not.
 }
 
 // config filename to be used to setup the worker service.
@@ -113,6 +114,7 @@ var defaultConfig = Configuration{
 	EnableLogsTimestampInUTC:         false,
 	DefaultJobsInfosTimezone:         "UTC",
 	LinuxWorkerMaxOpenFiles:          1000000,
+	EnableOnlineDiagnostics:          false,
 }
 
 // dumpDefaultConfig is triggered when passed config file is not found or erroned. It loads
