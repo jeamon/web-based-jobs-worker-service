@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"runtime/pprof"
 	"sort"
 	"strconv"
 	"strings"
@@ -777,4 +778,26 @@ func webPong(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprintf(w, "pong")
 
+}
+
+// getDiagnostics pull runtime stats : GET /worker/diagnostics.
+func getDiagnostics(w http.ResponseWriter, r *http.Request) {
+	f, ok := w.(http.Flusher)
+	w.Header().Set("Content-Type", "text/plain; charset=utf8")
+	w.WriteHeader(http.StatusOK)
+
+	// common statistics.
+	fmt.Fprintf(w, "---------------\n\n")
+	fmt.Fprintf(w, "Goroutines: %v\n", runtime.NumGoroutine())
+	fmt.Fprintf(w, "OS threads: %v\n", pprof.Lookup("threadcreate").Count())
+	fmt.Fprintf(w, "GOMAXPROCS: %v\n", runtime.GOMAXPROCS(0))
+	fmt.Fprintf(w, "Number CPU: %v\n", runtime.NumCPU())
+	fmt.Fprintf(w, "Num Blocks: %v\n", pprof.Lookup("block").Count())
+	if ok {
+		f.Flush()
+	}
+
+	// stack trace.
+	fmt.Fprintf(w, "\n---------------\n\n")
+	pprof.Lookup("goroutine").WriteTo(w, 2)
 }

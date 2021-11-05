@@ -11,9 +11,13 @@ func setupWebServerRoutes(router *http.ServeMux) {
 	// URI to check web & api routes availabilities.
 	router.HandleFunc("/worker/ping", pong)
 	router.HandleFunc("/worker/settings", getSettings)
-
 	// URI to check WEB routes availabilities.
 	router.HandleFunc("/worker/web/ping", webPong)
+
+	// Enabled web route to pull diagnostics data.
+	if Config.EnableOnlineDiagnostics {
+		router.HandleFunc("/worker/diagnostics", getDiagnostics)
+	}
 
 	// default web request - send web documentation.
 	router.HandleFunc("/", webV1Help)
