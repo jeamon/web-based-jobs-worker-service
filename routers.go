@@ -15,7 +15,7 @@ func setupWebServerRoutes(router *http.ServeMux) {
 	router.HandleFunc("/worker/web/ping", webPong)
 
 	// Enabled web route to pull diagnostics data.
-	if Config.EnableOnlineDiagnostics {
+	if Config.EnableOnDemandDiagnostics {
 		router.HandleFunc("/worker/diagnostics", getDiagnostics)
 	}
 
@@ -65,11 +65,18 @@ func setupWebServerRoutes(router *http.ServeMux) {
 func setupApiGatewayRoutes(router *http.ServeMux) {
 	// URI to check API routes availabilities.
 	router.HandleFunc("/worker/api/ping", apiPong)
-	// URI to check web & api routes availabilities.
-	// Enabled if web routes are disabled.
+
+	// Global worker routes to enable only if web routes are disabled.
 	if !Config.EnableWebAccess {
+
+		// URI to check web & api routes availabilities.
 		router.HandleFunc("/worker/ping", pong)
 		router.HandleFunc("/worker/settings", getSettings)
+
+		// URI to pull diagnostics data and trigger trace dump.
+		if Config.EnableOnDemandDiagnostics {
+			router.HandleFunc("/worker/diagnostics", getDiagnostics)
+		}
 	}
 
 	// default api request - send apis documentation.
