@@ -6,6 +6,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -782,22 +783,46 @@ func webPong(w http.ResponseWriter, r *http.Request) {
 
 // getDiagnostics pull runtime stats : GET /worker/diagnostics.
 func getDiagnostics(w http.ResponseWriter, r *http.Request) {
-	f, ok := w.(http.Flusher)
-	w.Header().Set("Content-Type", "text/plain; charset=utf8")
+	w.Header().Set("Content-Type", "application/json;charset=UTF-8")
 	w.WriteHeader(http.StatusOK)
-
-	// common statistics.
-	fmt.Fprintf(w, "---------------\n\n")
-	fmt.Fprintf(w, "Goroutines: %v\n", runtime.NumGoroutine())
-	fmt.Fprintf(w, "OS threads: %v\n", pprof.Lookup("threadcreate").Count())
-	fmt.Fprintf(w, "GOMAXPROCS: %v\n", runtime.GOMAXPROCS(0))
-	fmt.Fprintf(w, "Number CPU: %v\n", runtime.NumCPU())
-	fmt.Fprintf(w, "Num Blocks: %v\n", pprof.Lookup("block").Count())
-	if ok {
-		f.Flush()
+	var m = make(map[string]interface{})
+	// collect basics statistics.
+	m["RuntimeVer"] = runtime.Version()
+	m["UnixTimestamp"] = time.Now().Unix()
+	m["Goroutines"] = runtime.NumGoroutine()
+	m["OS threads"] = pprof.Lookup("threadcreate").Count()
+	m["GOMAXPROCS"] = runtime.GOMAXPROCS(0)
+	m["Number CPU"] = runtime.NumCPU()
+	m["Num Blocks"] = pprof.Lookup("block").Count()
+	m["Num Mutexes"] = pprof.Lookup("mutex").Count()
+	if program, err := os.Executable(); err == nil {
+		m["Executable"] = program
 	}
 
-	// stack trace.
-	fmt.Fprintf(w, "\n---------------\n\n")
-	pprof.Lookup("goroutine").WriteTo(w, 2)
+	// collect current memory statistics.
+	// https://pkg.go.dev/runtime#MemStats.
+	var memStats runtime.MemStats
+	runtime.ReadMemStats(&memStats)
+	// convert MemStats struct to json format.
+	b, err := json.Marshal(memStats)
+	if err == nil {
+		// convert MemStats json format to Map.
+		var mem map[string]interface{}
+		if err := json.Unmarshal(b, &mem); err == nil {
+			// remove unwanted field from the map.
+			delete(mem, "BySize")
+			// The most recent pause is at PauseNs[(NumGC+255)%256].
+			// PauseEnd is filled the same way as PauseNs.
+			// override <PauseNs> and <PauseEnd> accordingly.
+			mem["PauseNs"] = memStats.PauseNs[(memStats.NumGC+255)%256]
+			mem["PauseEnd"] = memStats.PauseEnd[(memStats.NumGC+255)%256]
+			// add this mem map to the main map m.
+			m["MemoryStats"] = mem
+		}
+	}
+
+	// convert m from map to json format and send.
+	if jsonResp, err := json.Marshal(m); err == nil {
+		w.Write(jsonResp)
+	}
 }
