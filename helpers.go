@@ -117,8 +117,6 @@ func createFolder(folderPath string) error {
 		} else {
 			log.Printf("path %q exists but it is not a folder so please check before continue - errmsg : %v\n", folderPath, err)
 			return err
-			// os.Remove(Config.WorkerPidFilePath)
-			// os.Exit(1)
 		}
 	}
 	// try to create the folder.
@@ -126,9 +124,6 @@ func createFolder(folderPath string) error {
 	if err != nil {
 		log.Printf("failed to create %q folder - errmsg : %v\n", folderPath, err)
 		return err
-		// try to remove any PID file.
-		// os.Remove(Config.WorkerPidFilePath)
-		// os.Exit(1)
 	}
 
 	return nil
