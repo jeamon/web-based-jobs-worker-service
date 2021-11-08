@@ -24,3 +24,6 @@ outputs
 
 # Ignore test binary
 *.test
+
+# Ignore the diagnostics stack trace folders
+diagnostics
