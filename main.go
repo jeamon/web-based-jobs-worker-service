@@ -20,10 +20,7 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"os/signal"
 	"strings"
-	"sync"
-	"syscall"
 )
 
 func displayVersion() {
@@ -34,25 +31,6 @@ func displayVersion() {
 func displayHelp() {
 	fmt.Printf("\n%s\n", webv1docs)
 	os.Exit(0)
-}
-
-// handleSignal is a function that process SIGTERM from kill command or CTRL-C or more.
-func handleSignal(exit chan struct{}, wg *sync.WaitGroup) {
-	log.Println("started goroutine for exit signal handling ...")
-	defer wg.Done()
-	sigch := make(chan os.Signal, 1)
-	signal.Notify(sigch, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGKILL,
-		syscall.SIGTERM, syscall.SIGHUP, os.Interrupt, os.Kill, syscall.SIGABRT)
-
-	// block until something comes in.
-	signalType := <-sigch
-	signal.Stop(sigch)
-	log.Println("received exit command [signal: %v]. stopping worker service.", signalType)
-	// perform cleanup action : remove pid file.
-	os.Remove(Config.WorkerPidFilePath)
-	// close quit channel, so jobs monitor goroutine will be notified.
-	close(exit)
-	return
 }
 
 func main() {
