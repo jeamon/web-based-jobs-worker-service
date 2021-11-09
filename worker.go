@@ -143,7 +143,7 @@ func runWorkerService() error {
 
 	// background handler for interruption signals.
 	wg.Add(1)
-	go handleSignal(exit, wg)
+	go handleSignals(exit, wg)
 
 	wg.Add(1)
 	// background jobs map cleaner.
