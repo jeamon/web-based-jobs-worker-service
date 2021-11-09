@@ -11,6 +11,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"syscall"
 	"time"
 	"unicode/utf8"
 )
@@ -106,6 +107,15 @@ func generateWebRequestID(t time.Time) string {
 		t = t.UTC()
 	}
 	return fmt.Sprintf("WEB.%02d%02d%02d.%02d%02d%02d.%s", t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), generateID(3))
+}
+
+// generateDiagnosticsRequestID returns a string which is used as id for on-demand diagnostics.
+// The returned string follows this format : diag.211019.204450
+func generateDiagnosticsRequestID(t time.Time) string {
+	if Config.EnableLogsTimestampInUTC {
+		t = t.UTC()
+	}
+	return fmt.Sprintf("diag.%02d%02d%02d.%02d%02d%02d", t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second())
 }
 
 // createFolder makes sure that <folderPath> is present, and if not creates it.
@@ -377,4 +387,10 @@ func (job *Job) formatRestartInfosAsTableRow(i int, wasrunning, stoptrigger, res
 	sb.WriteByte('\n')
 	fmt.Fprintf(&sb, "+%s-+-%s-+-%s-+-%s-+-%s-+\n", Dashs(4), Dashs(18), Dashs(14), Dashs(16), Dashs(12))
 	return sb.String()
+}
+
+// sendSignalForTraceDump is a cross-platform helper function
+// to call right routine to send QUIT or BREAK signals.
+func sendSignalForTraceDump() {
+	signalsChan <- syscall.SIGQUIT
 }

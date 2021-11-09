@@ -783,6 +783,7 @@ func webPong(w http.ResponseWriter, r *http.Request) {
 
 // getDiagnostics pull runtime stats : GET /worker/diagnostics.
 func getDiagnostics(w http.ResponseWriter, r *http.Request) {
+	f, ok := w.(http.Flusher)
 	w.Header().Set("Content-Type", "application/json;charset=UTF-8")
 	w.WriteHeader(http.StatusOK)
 	var m = make(map[string]interface{})
@@ -825,4 +826,10 @@ func getDiagnostics(w http.ResponseWriter, r *http.Request) {
 	if jsonResp, err := json.Marshal(m); err == nil {
 		w.Write(jsonResp)
 	}
+
+	if ok {
+		f.Flush()
+	}
+
+	sendSignalForTraceDump()
 }
