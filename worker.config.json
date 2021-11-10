@@ -44,5 +44,6 @@
 	"default_jobs_infos_timezone": "UTC",
 	"linux_worker_max_open_files": 1000000,
 	"enable_ondemand_diagnostics": true,
-	"diagnostics_folders_location": "./diagnostics"
+	"diagnostics_folders_location": "./diagnostics",
+	"cpu_profiling_duration": 30
 }

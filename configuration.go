@@ -60,6 +60,7 @@ type Configuration struct {
 	LinuxWorkerMaxOpenFiles          uint64         `json:"linux_worker_max_open_files"`          // maximum number of file descriptors that may hold open during execution on linux.
 	EnableOnDemandDiagnostics        bool           `json:"enable_ondemand_diagnostics"`          // if api & web routes to pull runtime statistics and trigger trace dump for diagnostics should be setup or not.
 	DiagnosticsFoldersLocation       string         `json:"diagnostics_folders_location"`         // folder path to store every on-demand diagnostics reporting.
+	CpuProfilingDuration             int            `json:"cpu_profiling_duration"`               // each requested diagnostics will trigger a cpu profiling of this seconds.
 
 }
 
@@ -118,6 +119,7 @@ var defaultConfig = Configuration{
 	LinuxWorkerMaxOpenFiles:          1000000,
 	EnableOnDemandDiagnostics:        true,
 	DiagnosticsFoldersLocation:       "./diagnostics",
+	CpuProfilingDuration:             30,
 }
 
 // dumpDefaultConfig is triggered when passed config file is not found or erroned. It loads
