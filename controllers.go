@@ -291,13 +291,19 @@ func handleSignals(exit chan struct{}, wg *sync.WaitGroup) {
 
 			if atomic.LoadUint32(&dump) == 1 {
 				// there is ongoing trace dumping.
+				log.Printf("cannot execute trace dump command [signal: %v] because there is ongoing diagnostics", sigType)
 				continue
 			}
 
 			atomic.StoreUint32(&dump, 1)
-			diagnosticsId := generateDiagnosticsRequestID(time.Now().UTC())
-			log.Printf("received trace dump command [signal: %v]. collecting diagnostics <%s>", sigType, diagnosticsId)
-			collectStackTrace(Config.DiagnosticsFoldersLocation, diagnosticsId, &dump)
+			go func() {
+				diagnosticsId := generateDiagnosticsRequestID(time.Now())
+				log.Printf("received trace dump command [signal: %v]. collecting diagnostics <%s>", sigType, diagnosticsId)
+				if ok := collectStackTrace(Config.DiagnosticsFoldersLocation, diagnosticsId, Config.CpuProfilingDuration); !ok {
+					log.Printf("error occured during stack traces dump for diagnostics <%s>", diagnosticsId)
+				}
+				atomic.StoreUint32(&dump, 0)
+			}()
 
 		default:
 			// must be an exit signal.
@@ -314,86 +320,109 @@ func handleSignals(exit chan struct{}, wg *sync.WaitGroup) {
 
 // collectStackTrace executes each on-demand runtime diagnostics data collection.
 // It creates a unique folder before and store the profiles output into.
-func collectStackTrace(diagsFolderLocation, diagid string, dumpPtr *uint32) {
-	// ensure that the dumping is flagged as ended once we leave.
-	defer atomic.StoreUint32(dumpPtr, 0)
+func collectStackTrace(diagsFolderLocation, diagid string, duration int) bool {
 
 	folderPath := filepath.Join(diagsFolderLocation, diagid)
 	if err := createFolder(folderPath); err != nil {
 		log.Printf("failed to create folder for diagnostics reporting [%s] - errmsg: %v\n", err, diagid)
-		return
+		return false
 	}
 
-	fm, err := os.Create(filepath.Join(folderPath, "memory.out"))
+	allgood := true
+
+	// perform CPU profiling for configured seconds.
+	fc, err := os.Create(filepath.Join(folderPath, "cpu.out"))
 	if err != nil {
-		log.Printf("failed to create <memory.out> for diagnostics reporting [%s] - errmsg: %v", diagid, err)
-		return
-	}
-	defer fm.Close()
-
-	fa, err := os.Create(filepath.Join(folderPath, "allocs.out"))
-	if err != nil {
-		log.Printf("failed to create <allocs.out> for diagnostics reporting [%s] - errmsg: %v", diagid, err)
-		return
-	}
-	defer fa.Close()
-
-	fg, err := os.Create(filepath.Join(folderPath, "goroutine.out"))
-	if err != nil {
-		log.Printf("failed to create <goroutine.out> for diagnostics reporting [%s] - errmsg: %v", diagid, err)
-		return
-	}
-	defer fg.Close()
-
-	ft, err := os.Create(filepath.Join(folderPath, "threads.out"))
-	if err != nil {
-		log.Printf("failed to create <threads.out> for diagnostics reporting [%s] - errmsg: %v", diagid, err)
-		return
-	}
-	defer ft.Close()
-
-	fb, err := os.Create(filepath.Join(folderPath, "block.out"))
-	if err != nil {
-		log.Printf("failed to create <block.out> for diagnostics reporting [%s] - errmsg: %v", diagid, err)
-		return
-	}
-	defer fb.Close()
-
-	fx, err := os.Create(filepath.Join(folderPath, "mutex.out"))
-	if err != nil {
-		log.Printf("failed to create <mutex.out> for diagnostics reporting [%s] - errmsg: %v", diagid, err)
-		return
-	}
-	defer fx.Close()
-
-	runtime.GC() // materialize all statistics.
-	// heap - a sampling of memory allocations of live objects.
-	if err = pprof.Lookup("heap").WriteTo(fm, 1); err != nil {
-		log.Printf("failed to dump heap profile for diagnostics reporting [%s] - errmsg: %v", diagid, err)
-	}
-
-	// allocs - a sampling of all past memory allocations.
-	if err = pprof.Lookup("allocs").WriteTo(fa, 1); err != nil {
-		log.Printf("failed to dump allocations profile for diagnostics reporting [%s] - errmsg: %v", diagid, err)
+		allgood = false
+		log.Printf("failed to create <cpu.out> for diagnostics reporting [%s] - errmsg: %v", diagid, err)
+	} else {
+		pprof.StartCPUProfile(fc)
+		time.Sleep(time.Duration(duration) * time.Second)
+		pprof.StopCPUProfile()
+		fc.Close()
 	}
 
 	// goroutine - stack traces of all current goroutines.
-	if err = pprof.Lookup("goroutine").WriteTo(fg, 2); err != nil {
-		log.Printf("failed to dump goroutine profile for diagnostics reporting [%s] - errmsg: %v", diagid, err)
+	fg, err := os.Create(filepath.Join(folderPath, "goroutine.out"))
+	if err != nil {
+		allgood = false
+		log.Printf("failed to create <goroutine.out> for diagnostics reporting [%s] - errmsg: %v", diagid, err)
+	} else {
+		if err = pprof.Lookup("goroutine").WriteTo(fg, 2); err != nil {
+			allgood = false
+			log.Printf("failed to dump goroutine profile for diagnostics reporting [%s] - errmsg: %v", diagid, err)
+		}
+		fg.Close()
 	}
 
 	// threadcreate - stack traces that led to the creation of new OS threads.
-	if err = pprof.Lookup("threadcreate").WriteTo(ft, 1); err != nil {
-		log.Printf("failed to dump os threads profile for diagnostics reporting [%s] - errmsg: %v", diagid, err)
+	ft, err := os.Create(filepath.Join(folderPath, "threads.out"))
+	if err != nil {
+		allgood = false
+		log.Printf("failed to create <threads.out> for diagnostics reporting [%s] - errmsg: %v", diagid, err)
+	} else {
+		if err = pprof.Lookup("threadcreate").WriteTo(ft, 1); err != nil {
+			allgood = false
+			log.Printf("failed to dump os threads profile for diagnostics reporting [%s] - errmsg: %v", diagid, err)
+		}
+		ft.Close()
 	}
 
 	// block - stack traces that led to blocking on synchronization primitives.
-	if err = pprof.Lookup("block").WriteTo(fb, 1); err != nil {
-		log.Printf("failed to dump block profile for diagnostics reporting [%s] - errmsg: %v", diagid, err)
+	fb, err := os.Create(filepath.Join(folderPath, "block.out"))
+	if err != nil {
+		allgood = false
+		log.Printf("failed to create <block.out> for diagnostics reporting [%s] - errmsg: %v", diagid, err)
+		return false
+	} else {
+		if err = pprof.Lookup("block").WriteTo(fb, 1); err != nil {
+			allgood = false
+			log.Printf("failed to dump block profile for diagnostics reporting [%s] - errmsg: %v", diagid, err)
+		}
+		fb.Close()
 	}
 
 	// mutex - stack traces of holders of contended mutexes.
-	if err = pprof.Lookup("mutex").WriteTo(fx, 1); err != nil {
-		log.Printf("failed to dump mutex profile for diagnostics reporting [%s] - errmsg: %v", diagid, err)
+	fm, err := os.Create(filepath.Join(folderPath, "mutex.out"))
+	if err != nil {
+		allgood = false
+		log.Printf("failed to create <mutex.out> for diagnostics reporting [%s] - errmsg: %v", diagid, err)
+	} else {
+		if err = pprof.Lookup("mutex").WriteTo(fm, 1); err != nil {
+			allgood = false
+			log.Printf("failed to dump mutex profile for diagnostics reporting [%s] - errmsg: %v", diagid, err)
+		}
+		fm.Close()
 	}
+
+	// trigger garbage collection to materialize all statistics.
+	runtime.GC()
+	// heap - a sampling of memory allocations of live objects.
+	// debug code is 0 bcz we want to use <go tool pprof> on it.
+	fh, err := os.Create(filepath.Join(folderPath, "memory.out"))
+	if err != nil {
+		allgood = false
+		log.Printf("failed to create <memory.out> for diagnostics reporting [%s] - errmsg: %v", diagid, err)
+	} else {
+		if err = pprof.Lookup("heap").WriteTo(fh, 0); err != nil {
+			allgood = false
+			log.Printf("failed to dump heap profile for diagnostics reporting [%s] - errmsg: %v", diagid, err)
+		}
+		fh.Close()
+	}
+
+	// allocs - a sampling of all past memory allocations.
+	fa, err := os.Create(filepath.Join(folderPath, "allocs.out"))
+	if err != nil {
+		allgood = false
+		log.Printf("failed to create <allocs.out> for diagnostics reporting [%s] - errmsg: %v", diagid, err)
+	} else {
+		if err = pprof.Lookup("allocs").WriteTo(fa, 1); err != nil {
+			allgood = false
+			log.Printf("failed to dump allocations profile for diagnostics reporting [%s] - errmsg: %v", diagid, err)
+		}
+	}
+	fa.Close()
+
+	return allgood
 }
