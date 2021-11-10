@@ -17,7 +17,7 @@ func requestMiddleware(next http.Handler) http.Handler {
 		var requestid string
 		if strings.HasPrefix(r.URL.Path, "/worker/api/") {
 			// api call, build the id and enable cors and log.
-			requestid = generateApiRequestID(time.Now().UTC())
+			requestid = generateApiRequestID(time.Now())
 			apilog.Printf("[request:%s] - [ip:%s] - [method:%s] - [url:%s] - [agent:%s]\n", requestid, r.RemoteAddr, r.Method, r.URL, r.UserAgent())
 			enableCORS(&w, r)
 
@@ -29,7 +29,7 @@ func requestMiddleware(next http.Handler) http.Handler {
 
 		} else {
 			// process as web requests. so build the id and log.
-			requestid = generateWebRequestID(time.Now().UTC())
+			requestid = generateWebRequestID(time.Now())
 			weblog.Printf("[request: %s] - [ip: %s] - [method: %s] - [url: %s] - [agent: %s]\n", requestid, r.RemoteAddr, r.Method, r.URL, r.UserAgent())
 		}
 
