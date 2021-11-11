@@ -254,10 +254,9 @@ func executeJob(job *Job, ctx context.Context) {
 		if !stopped {
 			// exited from select loop due to other reason than job stop request.
 			jobslog.Printf("[%s] [%05d] completed the processing of the job\n", job.id, job.pid)
-			// success, exitCode should be 0
-			ws := cmd.ProcessState.Sys().(syscall.WaitStatus)
+			// success, exitCode is 0.
 			job.lock.Lock()
-			job.exitcode = ws.ExitStatus()
+			job.exitcode = 0
 			job.lock.Unlock()
 		} else {
 			// job completed with stop request.
