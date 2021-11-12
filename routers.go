@@ -14,6 +14,9 @@ func setupWebServerRoutes(router *http.ServeMux) {
 	// URI to check WEB routes availabilities.
 	router.HandleFunc("/worker/web/ping", webPong)
 
+	// URI to collect useful worker statistics.
+	router.HandleFunc("/worker/health", getHealth)
+
 	// Enabled web route to pull diagnostics data.
 	if Config.EnableOnDemandDiagnostics {
 		router.HandleFunc("/worker/diagnostics", getDiagnostics)
@@ -72,6 +75,9 @@ func setupApiGatewayRoutes(router *http.ServeMux) {
 		// URI to check web & api routes availabilities.
 		router.HandleFunc("/worker/ping", pong)
 		router.HandleFunc("/worker/settings", getSettings)
+
+		// URI to collect useful worker statistics.
+		router.HandleFunc("/worker/health", getHealth)
 
 		// URI to pull diagnostics data and trigger trace dump.
 		if Config.EnableOnDemandDiagnostics {
