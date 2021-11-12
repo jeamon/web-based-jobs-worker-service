@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -269,13 +270,15 @@ func executeJob(job *Job, ctx context.Context) {
 // global channel to receive os signals.
 var signalsChan = make(chan os.Signal, 2)
 
+// flag to check if there is ongoing stack trace dumping.
+// 1 means there is ongoing stack trace collection and 0 no.
+var isDumping uint32
+
 // handleSignals is a function that processes common and custom signals types.
 func handleSignals(exit chan struct{}, wg *sync.WaitGroup) {
 	log.Println("started goroutine for exit signal handling ...")
 	defer wg.Done()
-	// if 1 means ongoing stack trace dumping.
-	var dump uint32
-	// signalsChan := make(chan os.Signal, 1)
+
 	// setup the list of supported signals types.
 	signal.Notify(signalsChan, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGKILL,
 		syscall.SIGTERM, syscall.SIGHUP, os.Interrupt, os.Kill, syscall.SIGABRT)
@@ -286,22 +289,22 @@ func handleSignals(exit chan struct{}, wg *sync.WaitGroup) {
 
 		case syscall.SIGQUIT:
 			// SIGQUIT 	3 - QUIT character (Ctrl+/) to trigger.
-			// received stack trace dump signal.
+			// received stack trace isDumping signal.
 
-			if atomic.LoadUint32(&dump) == 1 {
+			if atomic.LoadUint32(&isDumping) == 1 {
 				// there is ongoing trace dumping.
 				log.Printf("cannot execute trace dump command [signal: %v] because there is ongoing diagnostics", sigType)
 				continue
 			}
 
-			atomic.StoreUint32(&dump, 1)
+			atomic.StoreUint32(&isDumping, 1)
 			go func() {
 				diagnosticsId := generateDiagnosticsRequestID(time.Now())
 				log.Printf("received trace dump command [signal: %v]. collecting diagnostics <%s>", sigType, diagnosticsId)
 				if ok := collectStackTrace(Config.DiagnosticsFoldersLocation, diagnosticsId, Config.CpuProfilingDuration); !ok {
 					log.Printf("error occured during stack traces dump for diagnostics <%s>", diagnosticsId)
 				}
-				atomic.StoreUint32(&dump, 0)
+				atomic.StoreUint32(&isDumping, 0)
 			}()
 
 		default:
@@ -424,4 +427,45 @@ func collectStackTrace(diagsFolderLocation, diagid string, duration int) bool {
 	fa.Close()
 
 	return allgood
+}
+
+// collectHealth gathers system statistics.
+func collectHealth(h map[string]interface{}) {
+	// collect basics system statistics.
+	var m = make(map[string]interface{})
+	m["LocalTime"] = time.Now()
+	m["RuntimeVer"] = runtime.Version()
+	m["Goroutines"] = runtime.NumGoroutine()
+	m["OS threads"] = pprof.Lookup("threadcreate").Count()
+	m["GOMAXPROCS"] = runtime.GOMAXPROCS(0)
+	m["Number CPU"] = runtime.NumCPU()
+	m["Num Blocks"] = pprof.Lookup("block").Count()
+	m["Num Mutexes"] = pprof.Lookup("mutex").Count()
+	if program, err := os.Executable(); err == nil {
+		m["Executable"] = program
+	}
+
+	h["SystemStats"] = m
+
+	// collect current memory statistics.
+	// https://pkg.go.dev/runtime#MemStats.
+	var memStats runtime.MemStats
+	runtime.ReadMemStats(&memStats)
+	// convert MemStats struct to json format.
+	b, err := json.Marshal(memStats)
+	if err == nil {
+		// convert MemStats json format to Map.
+		var mem map[string]interface{}
+		if err := json.Unmarshal(b, &mem); err == nil {
+			// remove unwanted field from the map.
+			delete(mem, "BySize")
+			// The most recent pause is at PauseNs[(NumGC+255)%256].
+			// PauseEnd is filled the same way as PauseNs.
+			// override <PauseNs> and <PauseEnd> accordingly.
+			mem["PauseNs"] = memStats.PauseNs[(memStats.NumGC+255)%256]
+			mem["PauseEnd"] = memStats.PauseEnd[(memStats.NumGC+255)%256]
+			// add this mem map to the main map m.
+			h["MemoryStats"] = mem
+		}
+	}
 }
