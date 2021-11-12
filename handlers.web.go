@@ -15,11 +15,11 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
-	"runtime/pprof"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -781,55 +781,32 @@ func webPong(w http.ResponseWriter, r *http.Request) {
 
 }
 
-// getDiagnostics pull runtime stats : GET /worker/diagnostics.
-func getDiagnostics(w http.ResponseWriter, r *http.Request) {
-	f, ok := w.(http.Flusher)
+// getHealth pull common system stats : GET /worker/health.
+func getHealth(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json;charset=UTF-8")
 	w.WriteHeader(http.StatusOK)
-	var m = make(map[string]interface{})
-	// collect basics statistics.
-	m["RuntimeVer"] = runtime.Version()
-	m["UnixTimestamp"] = time.Now().Unix()
-	m["Goroutines"] = runtime.NumGoroutine()
-	m["OS threads"] = pprof.Lookup("threadcreate").Count()
-	m["GOMAXPROCS"] = runtime.GOMAXPROCS(0)
-	m["Number CPU"] = runtime.NumCPU()
-	m["Num Blocks"] = pprof.Lookup("block").Count()
-	m["Num Mutexes"] = pprof.Lookup("mutex").Count()
-	if program, err := os.Executable(); err == nil {
-		m["Executable"] = program
-	}
-
-	// collect current memory statistics.
-	// https://pkg.go.dev/runtime#MemStats.
-	var memStats runtime.MemStats
-	runtime.ReadMemStats(&memStats)
-	// convert MemStats struct to json format.
-	b, err := json.Marshal(memStats)
-	if err == nil {
-		// convert MemStats json format to Map.
-		var mem map[string]interface{}
-		if err := json.Unmarshal(b, &mem); err == nil {
-			// remove unwanted field from the map.
-			delete(mem, "BySize")
-			// The most recent pause is at PauseNs[(NumGC+255)%256].
-			// PauseEnd is filled the same way as PauseNs.
-			// override <PauseNs> and <PauseEnd> accordingly.
-			mem["PauseNs"] = memStats.PauseNs[(memStats.NumGC+255)%256]
-			mem["PauseEnd"] = memStats.PauseEnd[(memStats.NumGC+255)%256]
-			// add this mem map to the main map m.
-			m["MemoryStats"] = mem
-		}
-	}
-
+	var h = make(map[string]interface{})
+	collectHealth(h)
 	// convert m from map to json format and send.
-	if jsonResp, err := json.Marshal(m); err == nil {
+	if jsonResp, err := json.Marshal(h); err == nil {
 		w.Write(jsonResp)
 	}
+}
 
-	if ok {
-		f.Flush()
+// getDiagnostics pull runtime stats : GET /worker/diagnostics.
+func getDiagnostics(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json;charset=UTF-8")
+	w.WriteHeader(http.StatusOK)
+	if atomic.LoadUint32(&isDumping) == 1 {
+		// there is ongoing trace dumping so ignore the request.
+		json.NewEncoder(w).Encode(struct {
+			Message string `json:"message"`
+		}{"ignored. already ongoing trace dump."})
+	} else {
+		// trigger trace dump.
+		sendSignalForTraceDump()
+		json.NewEncoder(w).Encode(struct {
+			Message string `json:"message"`
+		}{"accepted. triggered trace dump."})
 	}
-
-	sendSignalForTraceDump()
 }
