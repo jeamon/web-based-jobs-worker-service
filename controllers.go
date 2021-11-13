@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"runtime/pprof"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -434,9 +435,10 @@ func collectHealth(h map[string]interface{}) {
 	// collect basics system statistics.
 	var m = make(map[string]interface{})
 	m["LocalTime"] = time.Now()
-	m["RuntimeVer"] = runtime.Version()
+	m["System Name"] = runtime.GOOS
+	m["GoVersion"] = runtime.Version()
 	m["Goroutines"] = runtime.NumGoroutine()
-	m["OS threads"] = pprof.Lookup("threadcreate").Count()
+	m["OS Threads"] = pprof.Lookup("threadcreate").Count()
 	m["GOMAXPROCS"] = runtime.GOMAXPROCS(0)
 	m["Number CPU"] = runtime.NumCPU()
 	m["Num Blocks"] = pprof.Lookup("block").Count()
@@ -459,13 +461,43 @@ func collectHealth(h map[string]interface{}) {
 		if err := json.Unmarshal(b, &mem); err == nil {
 			// remove unwanted field from the map.
 			delete(mem, "BySize")
-			// The most recent pause is at PauseNs[(NumGC+255)%256].
-			// PauseEnd is filled the same way as PauseNs.
-			// override <PauseNs> and <PauseEnd> accordingly.
-			mem["PauseNs"] = memStats.PauseNs[(memStats.NumGC+255)%256]
-			mem["PauseEnd"] = memStats.PauseEnd[(memStats.NumGC+255)%256]
+			delete(mem, "PauseNs")
+			delete(mem, "PauseEnd")
 			// add this mem map to the main map m.
 			h["MemoryStats"] = mem
 		}
 	}
+	// add network stats.
+	collectNetworkStats(h)
+}
+
+// collectNetworkStats gathers networking related information.
+func collectNetworkStats(h map[string]interface{}) {
+	var out []byte
+	var err error
+	n := map[string]int{"Established": 0, "TimeWait": 0, "CloseWait": 0, "FinWait": 0}
+	h["NetworkStats"] = n
+
+	if runtime.GOOS == "windows" {
+		// dos command to pull stats on windows.
+		out, err = exec.Command("cmd", "/C", fmt.Sprintf("netstat -pan TCP | findstr :%s", Config.HttpsServerPort)).Output()
+		if err != nil {
+			log.Printf("failed to collect network statistics - errmsg: %v", err)
+			return
+		}
+	} else {
+		// shell syntax to pull stats on unix-like OSes.
+		out, err = exec.Command(Config.DefaultLinuxShell, "-c", fmt.Sprintf("netstat -ant | grep :%s", Config.HttpsServerPort)).Output()
+		if err != nil {
+			log.Printf("failed to collect network statistics - errmsg: %v", err)
+			return
+		}
+	}
+	data := string(out[:])
+	out = nil
+	// count each wanted TCP states statistics.
+	n["Established"] = strings.Count(data, "ESTABLISHED")
+	n["TimeWait"] = strings.Count(data, "TIME_WAIT")
+	n["CloseWait"] = strings.Count(data, "CLOSE_WAIT")
+	n["FinWait"] = strings.Count(data, "FIN_WAIT")
 }
