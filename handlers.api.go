@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"regexp"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -317,4 +318,34 @@ func getSettings(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json;charset=UTF-8")
 	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(Config)
+}
+
+// getHealth pull common system stats : GET /worker/health.
+func getHealth(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json;charset=UTF-8")
+	w.WriteHeader(http.StatusOK)
+	var h = make(map[string]interface{})
+	collectHealth(h)
+	// convert m from map to json format and send.
+	if jsonResp, err := json.Marshal(h); err == nil {
+		w.Write(jsonResp)
+	}
+}
+
+// getDiagnostics pull runtime stats : GET /worker/diagnostics.
+func getDiagnostics(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json;charset=UTF-8")
+	w.WriteHeader(http.StatusOK)
+	if atomic.LoadUint32(&isDumping) == 1 {
+		// there is ongoing trace dumping so ignore the request.
+		json.NewEncoder(w).Encode(struct {
+			Message string `json:"message"`
+		}{"ignored. already ongoing trace dump."})
+	} else {
+		// trigger trace dump.
+		sendSignalForTraceDump()
+		json.NewEncoder(w).Encode(struct {
+			Message string `json:"message"`
+		}{"accepted. triggered trace dump."})
+	}
 }
