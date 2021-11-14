@@ -15,7 +15,7 @@
     <pre id="output"></pre>
     <script type="text/javascript">
             // const jobid = "{{.id}}";
-            var output = document.getElementById("output");
+            const output = document.getElementById("output");
             console.log("connecting to websocket server ...");
             const sock = new WebSocket("wss://{{.server}}/worker/web/v1/jobs/long/output/stream?id={{.id}}");
             
@@ -27,6 +27,8 @@
             sock.onmessage = function(event) {
                 // console.log("[rcv] " + event.data);
                 output.textContent += event.data;
+                // move vertical scrollbar to bottom of the page.
+                window.scrollTo(0,document.body.scrollHeight);
             };
 
             sock.onerror = function(error) {
