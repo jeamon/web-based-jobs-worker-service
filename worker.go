@@ -192,7 +192,7 @@ func checkWorkerService() (err error) {
 	// on windows platform, we use tasklist and findstr to search for the pid.
 	// Because syscall.Signal is not available in Windows.
 	if runtime.GOOS == "windows" {
-		out, err := exec.Command("cmd", "/C", fmt.Sprintf("tasklist /FI \"PID eq %d\" | findstr %d", pid, pid)).Output()
+		out, err := exec.Command("cmd", "/K", fmt.Sprintf("tasklist /FI \"PID eq %d\" | findstr %d", pid, pid)).Output()
 		if err != nil {
 			fmt.Println(err)
 			fmt.Printf("process [pid: %d] does not exist. removing pid file: %s\n", pid, Config.WorkerPidFilePath)
