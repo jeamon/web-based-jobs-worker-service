@@ -18,7 +18,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"strings"
 )
@@ -70,8 +69,8 @@ func main() {
 	}
 
 	if err != nil {
-		log.Println(option, "error:", err)
-		os.Exit(1)
+		fmt.Printf("%s: error: %v\n", option, err)
+		os.Exit(0) // use 0 to avoid output on stdout.
 	}
 
 	// below exit will terminate the group leader (current process)

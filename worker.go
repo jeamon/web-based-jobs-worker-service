@@ -194,11 +194,16 @@ func checkWorkerService() (err error) {
 	if runtime.GOOS == "windows" {
 		out, err := exec.Command("cmd", "/K", fmt.Sprintf("tasklist /FI \"PID eq %d\" | findstr %d", pid, pid)).Output()
 		if err != nil {
-			fmt.Println(err)
-			fmt.Printf("process [pid: %d] does not exist. removing pid file: %s\n", pid, Config.WorkerPidFilePath)
+			fmt.Printf("\n[-] process [pid: %d] does not seem to exist. removing the pid file: <%s>\n", pid, Config.WorkerPidFilePath)
 			os.Remove(Config.WorkerPidFilePath)
 			// set back to 0 so defer function can display inactive status.
 			pid = 0
+
+			// manual verification instructions.
+			fmt.Println("\n[1] Open the windows console with administrator privileges")
+			fmt.Printf("[2] Check if the worker.exe is running with <tasklist /FI \"PID eq %v\">\n", pid)
+			fmt.Printf("[3] If it is running, try to force stop it with <taskkill /F /PID %v /T>\n\n", pid)
+
 			return err
 		}
 
