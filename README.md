@@ -76,6 +76,7 @@ Below is a summary of available features. This section will be updated as projec
 * capability to check worker liveness (ping/pong) and API/WEB routes availability and pull its settings
 * user-defined timezone to use when displaying job time-related information (submit / start / end datetime).
 * capability to enforce the maximum number of open files the worker can hold when running on unix-like OSes. 
+* web & api routes to fetch the global health and dump stack traces (diagnostics data) of the worker service.
 
 
 Please feel free to have a look at the [Web Access](#web-access) and [Rest APIs](#rest-apis) for practical examples.
@@ -456,10 +457,22 @@ you must replace the (#) by its encoded value (%23). For example, to use #77216F
 	```
 
 
-* To check get the complete current and in use settings of the worker service:
+* To display the complete current and in use settings of the worker service:
 
 	```
 	GET /worker/settings
+	```
+
+* To fetch and display current health details of the worker service:
+
+	```
+	GET /worker/health
+	```
+
+* To trigger and save on the server the trace dump and runtime stats of the worker service:
+
+	```
+	GET /worker/diagnostics
 	```
 
 ## Upcomings
@@ -475,7 +488,6 @@ you must replace the (#) by its encoded value (%23). For example, to use #77216F
 * propagate web request or api call id into jobs processing logs.
 * enforce per process resources limitations (cpu and memory usage).
 * add web and api to delete one or multiple jobs (stop if running or backup their output if done).
-* add web and api routes to fetch the global health and diagnostics of the worker service.
 
 
 ## Contribution
