@@ -27,3 +27,11 @@ outputs
 
 # Ignore the diagnostics stack trace folders
 diagnostics
+
+# Ignore Linux executable
+worker
+
+# Ignore local pictures and diapo
+*.png
+*.PNG
+*.pptx
