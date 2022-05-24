@@ -2,7 +2,20 @@ package main
 
 // @docs.go contains the how to use this worker service. which is accessible from the root web interface.
 
-const version = " <jobs-worker-service> • version 1.1 By Jerome AMON"
+const infos = "web-based <jobs-worker-service>"
+
+var (
+	Version    string
+	BuildTime  string
+	GitCommit  string
+	GoVersion  string
+	TargetOS   string
+	TargetArch string
+	WebVersion string
+	APIVersion string
+	Author     string = "Jerome Amon <cloudmentor.scale@gmail.com>"
+	SourceLink string = "https://github.com/jeamon/web-based-jobs-worker-service/commit/"
+)
 
 const webv1docs = `
 
@@ -22,7 +35,7 @@ const webv1docs = `
 
 	----------------------------------------------------------------------------------------------
 	
-			[current version 1.1 By Jerome AMON - cloudmentor.scale@gmail.com]
+			   [latest version By Jerome AMON - cloudmentor.scale@gmail.com]
 
 	----------------------------------------------------------------------------------------------
 

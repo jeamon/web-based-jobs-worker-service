@@ -12,9 +12,7 @@ package main
 
 // https://blog.cloudmentor-scale.com/contact
 
-// Version  : 1.1
-// Author   : Jerome AMON
-// Created  : 20 August 2021
+// Author   : Jerome AMON <Go FullStack Developer>
 
 import (
 	"fmt"
@@ -23,7 +21,16 @@ import (
 )
 
 func displayVersion() {
-	fmt.Printf("\n%s\n", version)
+	fmt.Printf("\n %s\n\n", infos)
+	fmt.Println(" Version ID   :", Version)
+	fmt.Println(" Web version  :", WebVersion)
+	fmt.Println(" API version  :", APIVersion)
+	fmt.Println(" Go version   :", strings.TrimLeft(GoVersion, "go"))
+	fmt.Println(" Build Time   :", BuildTime)
+	fmt.Println(" Target OS    :", TargetOS+"/"+TargetArch)
+	fmt.Println(" Git commit   :", GitCommit)
+	fmt.Println(" Author infos :", Author)
+	fmt.Println(" Source code  :", SourceLink+GitCommit)
 	os.Exit(0)
 }
 
