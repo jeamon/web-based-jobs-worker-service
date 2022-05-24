@@ -103,22 +103,22 @@ Thus makes it easier to move as you wish to a more garnular packaging approach d
 ## Setup
 
 On Windows, Linux, macOS and FreeBSD you will be able to download the pre-built binaries once available.
-If your system has [Go >= 1.16+](https://golang.org/dl/) you can pull the codebase and build from the source.
+If your system has [Go >= 1.16+](https://golang.org/dl/) you can pull the codebase and run the build script.
 
 
 * Build the worker program on windows
 ```shell
 $ git clone https://github.com/jeamon/web-based-jobs-worker-service.git
 $ cd web-based-jobs-worker-service
-$ go build -o worker.exe .
+$ build.script.windows.bat
 ```
 
 * Build the worker program on linux and others
 ```shell
 $ git clone https://github.com/jeamon/web-based-jobs-worker-service.git
 $ cd web-based-jobs-worker-service
-$ go build -o worker .
-$ chmod +x ./worker
+$ chmod +x build.script.linux.sh
+$ ./build.script.linux.sh
 ```
 
 * Build with docker for linux-based systems
