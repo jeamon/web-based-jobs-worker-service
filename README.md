@@ -141,12 +141,16 @@ $ docker run -d --publish 8080:8080 --name unix-worker --rm unix-worker /bin/sh 
 
 	[+] On Windows Operating System.
 	```
-	worker.exe [ start | stop | restart | status | help | version]
+	$ worker.exe [ start [--host <address> | --port <number>] | stop | restart [-host <address> | -port <number>] | status | help | version]
+	$ worker.exe start --host localhost --port 8080
+	$ worker.exe restart -host 127.0.0.1 -port 8090
 	```
 
 	[+] On Linux Operating System.
 	```
-	./worker [ start | stop | restart | status | help | version]
+	$ ./worker [ start [--host <address> | --port <number>] | stop | restart [-host <address> | -port <number>] | status | help | version]
+	$ ./worker start --host localhost --port 8080
+	$ ./worker restart -host 127.0.0.1 -port 8090
 	```
 
 
