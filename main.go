@@ -15,6 +15,7 @@ package main
 // Author   : Jerome AMON <Go FullStack Developer>
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"strings"
@@ -39,40 +40,66 @@ func displayHelp() {
 	os.Exit(0)
 }
 
+func displayUsage() {
+	fmt.Printf("\n$$ Usage: %s [command] [--options] [arguments] \n", os.Args[0])
+	fmt.Printf("Commands: [start | stop | restart | status | help | version] \n")
+	fmt.Printf("Options : [--host <address>] [--port <number>] \n")
+	fmt.Println("\nExamples:")
+	fmt.Printf("$ %s start --host <address> --port <number> \n", os.Args[0])
+	fmt.Printf("$ %s start --host 127.0.0.1 --port 8080 \n", os.Args[0])
+	fmt.Printf("$ %s restart --host <address> --port <number> \n", os.Args[0])
+	fmt.Printf("$ %s restart --host 127.0.0.1 --port 8080 \n", os.Args[0])
+}
+
 func main() {
 
-	if len(os.Args) != 2 {
+	if len(os.Args) < 2 {
 		// returned the program name back since someone could have
 		// compiled with another output name. Then gracefully exit.
-		fmt.Printf("Usage: %s [start|stop|restart|status|help|version] \n", os.Args[0])
+		displayUsage()
 		os.Exit(0)
 	}
 
-	var err error
-	option := strings.ToLower(os.Args[1])
-
 	// load and setup worker settings.
 	loadConfigFile(DefaultConfigFile)
+
+	// parse and use temporarily provided host & port values.
+	startCommand := flag.NewFlagSet("start", flag.ExitOnError)
+	startHost := startCommand.String("host", Config.HttpsServerHost, "web server ip address")
+	startPort := startCommand.String("port", Config.HttpsServerPort, "web server port number")
+
+	restartCommand := flag.NewFlagSet("restart", flag.ExitOnError)
+	restartHost := restartCommand.String("host", Config.HttpsServerHost, "web server ip address")
+	restartPort := restartCommand.String("port", Config.HttpsServerPort, "web server port number")
+
+	var err error
+	option := strings.ToLower(os.Args[1])
 
 	switch option {
 	case "run":
 		err = runWorkerService()
 	case "start":
+		startCommand.Parse(os.Args[2:])
+		Config.HttpsServerHost = *startHost
+		Config.HttpsServerPort = *startPort
 		err = startWorkerService()
+	case "restart":
+		restartCommand.Parse(os.Args[2:])
+		Config.HttpsServerHost = *restartHost
+		Config.HttpsServerPort = *restartPort
+		err = restartWorkerService()
 	case "stop":
 		err = stopWorkerService()
 	case "status":
 		err = checkWorkerService()
-	case "restart":
-		err = restartWorkerService()
 	case "help":
 		displayHelp()
 	case "version":
 		displayVersion()
 	default:
 		// not implemented command.
-		fmt.Printf("unknown command: %v\n", os.Args[1])
-		fmt.Printf("Usage: %s [start|stop|restart|status|help|version] \n", os.Args[0])
+		fmt.Printf("\nUnknown command: %v\n", os.Args[1])
+		displayUsage()
 	}
 
 	if err != nil {
